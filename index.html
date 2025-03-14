@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Podcast Aufnahme mit Supabase</title>
+</head>
+<body>
+  <h1>Podcast Aufnahme mit Supabase</h1>
+  <button id="startBtn">Aufnahme starten</button>
+  <button id="stopBtn" disabled>Aufnahme stoppen</button>
+  <audio id="audioPlayer" controls></audio>
+  <p id="uploadStatus"></p>
+
+  <!-- ES-Modul-Script -->
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+    // 1) Supabase-Client erstellen
+    const SUPABASE_URL = "https://qzmzlrsfuepbkqwzbrir.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let mediaRecorder;
+    let audioChunks = [];
+
+    // 2) Aufnahme starten
+    document.getElementById("startBtn").addEventListener("click", async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = event => {
+          if (event.data.size > 0) {
+            audioChunks.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstop = async () => {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          const fileName = `podcast_${Date.now()}.webm`;
+
+          // Datei zu Supabase hochladen
+          await uploadToSupabase(audioBlob, fileName);
+        };
+
+        mediaRecorder.start();
+        document.getElementById("startBtn").disabled = true;
+        document.getElementById("stopBtn").disabled = false;
+      } catch (err) {
+        alert("Mikrofon-Zugriff nicht erlaubt oder nicht verfügbar.");
+        console.error(err);
+      }
+    });
+
+    // 3) Aufnahme stoppen
+    document.getElementById("stopBtn").addEventListener("click", () => {
+      if (mediaRecorder) {
+        mediaRecorder.stop();
+        document.getElementById("startBtn").disabled = false;
+        document.getElementById("stopBtn").disabled = true;
+      }
+    });
+
+    // 4) Upload-Funktion
+    async function uploadToSupabase(blob, fileName) {
+      // Im Bucket "podcast-audio" speichern
+      const { data, error } = await supabaseClient
+        .storage
+        .from('podcast-audio')
+        .upload(fileName, blob, { contentType: 'audio/webm' });
+
+      if (error) {
+        console.error("Upload-Fehler:", error);
+        document.getElementById("uploadStatus").innerText = "❌ Fehler beim Upload";
+        return;
+      }
+
+      // Download-Link abrufen
+      const { data: publicUrl } = supabaseClient
+        .storage
+        .from('podcast-audio')
+        .getPublicUrl(fileName);
+
+      document.getElementById("uploadStatus").innerHTML =
+        `✅ Hochgeladen: <a href="${publicUrl.publicUrl}" target="_blank">Podcast anhören</a>`;
+    }
+  </script>
+</body>
+</html>
