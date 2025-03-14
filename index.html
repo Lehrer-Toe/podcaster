@@ -2,30 +2,175 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Podcast Aufnahme mit Supabase</title>
+  <title>Podcast Aufnahme mit Supabase & Admin</title>
+  <!-- FFmpeg.js für die MP3-Konvertierung -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ffmpeg.js/4.2.9003/ffmpeg.min.js"></script>
+  <style>
+    body {
+      margin: 0; 
+      font-family: Arial, sans-serif; 
+      background: #f4f4f4; 
+      color: #333;
+    }
+    header {
+      background: #4CAF50;
+      color: #fff;
+      padding: 1rem;
+      text-align: center;
+    }
+    .container {
+      max-width: 600px;
+      margin: 2rem auto;
+      background: #fff;
+      padding: 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 1.5rem;
+    }
+    .input-group {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+    label {
+      flex: 1;
+    }
+    input[type="text"] {
+      flex: 2;
+      padding: 0.5rem;
+    }
+    button {
+      padding: 0.6rem 1rem;
+      font-size: 1rem;
+      margin: 0.5rem 0.3rem;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      background: #4CAF50;
+      color: #fff;
+      transition: background 0.2s ease;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    audio {
+      width: 100%;
+      margin: 1rem 0;
+    }
+    #uploadStatus {
+      margin: 1rem 0;
+      font-weight: bold;
+    }
+    .file-list, .admin-panel {
+      margin-top: 2rem;
+    }
+    .file-list h2, .admin-panel h2 {
+      margin-bottom: 0.5rem;
+    }
+    .file-list ul, .admin-panel ul {
+      list-style: none;
+      padding-left: 0;
+      margin: 0;
+    }
+    .file-list li, .admin-panel li {
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .file-list a, .admin-panel a {
+      color: #4CAF50;
+      text-decoration: none;
+    }
+    .file-list a:hover, .admin-panel a:hover {
+      text-decoration: underline;
+    }
+    .admin-panel {
+      display: none;
+      border-top: 1px solid #ccc;
+      padding-top: 1rem;
+    }
+    .admin-panel button.delete {
+      background: #d9534f;
+    }
+    .admin-panel button.delete:hover {
+      background: #c9302c;
+    }
+  </style>
 </head>
 <body>
-  <h1>Podcast Aufnahme mit Supabase</h1>
-  <button id="startBtn">Aufnahme starten</button>
-  <button id="stopBtn" disabled>Aufnahme stoppen</button>
-  <audio id="audioPlayer" controls></audio>
-  <p id="uploadStatus"></p>
+  <header>
+    <h1>Podcast Aufnahme mit Supabase</h1>
+  </header>
+
+  <div class="container">
+    <!-- Eingabe für Dateinamen -->
+    <div class="input-group">
+      <label for="filename">Dateiname (ohne .mp3):</label>
+      <input type="text" id="filename" placeholder="z.B. meine-aufnahme" />
+    </div>
+
+    <!-- Aufnahme-Buttons -->
+    <button id="startBtn">Aufnahme starten</button>
+    <button id="stopBtn" disabled>Aufnahme stoppen</button>
+    <!-- Neuer Upload-Button (wird aktiviert, wenn Aufnahme vorhanden ist) -->
+    <button id="uploadBtn" disabled>Hochladen</button>
+
+    <!-- Audio-Player für die Aufnahme -->
+    <audio id="audioPlayer" controls></audio>
+
+    <!-- Statusmeldungen -->
+    <p id="uploadStatus"></p>
+
+    <!-- Dateiliste (für alle Nutzer sichtbar) -->
+    <div class="file-list">
+      <h2>Vorhandene Aufnahmen:</h2>
+      <ul id="fileList"></ul>
+    </div>
+
+    <!-- Admin-Oberfläche -->
+    <div class="admin-panel" id="adminPanel">
+      <h2>Admin-Oberfläche</h2>
+      <ul id="adminFileList"></ul>
+      <button id="closeAdminBtn">Admin schließen</button>
+    </div>
+    <!-- Admin-Login Button -->
+    <button id="adminLoginBtn" style="background:#333;">Admin Login</button>
+  </div>
 
   <!-- ES-Modul-Script -->
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-    // 1) Supabase-Client erstellen
+    // Supabase-Konfiguration (API-Key anpassen)
     const SUPABASE_URL = "https://qzmzlrsfuepbkqwzbrir.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6bXpscnNmdWVwYmtxd3picmlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE5NTkxMzAsImV4cCI6MjA1NzUzNTEzMH0.zLZDSfylloUxlxYPEpfO4VMAdf0cNpUzKH2T9qv8ezI"
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6bXpscnNmdWVwYmtxd3picmlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE5NTkxMzAsImV4cCI6MjA1NzUzNTEzMH0.zLZDSfylloUxlxYPEpfO4VMAdf0cNpUzKH2T9qv8ezI";
     const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    // Globale Variablen
     let mediaRecorder;
     let audioChunks = [];
+    let currentRecordingBlob = null; // Speicherung der aktuellen Aufnahme (WebM)
 
-    // 2) Aufnahme starten
-    document.getElementById("startBtn").addEventListener("click", async () => {
+    // DOM-Elemente
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const audioPlayer = document.getElementById("audioPlayer");
+    const uploadStatus = document.getElementById("uploadStatus");
+    const fileList = document.getElementById("fileList");
+    const adminPanel = document.getElementById("adminPanel");
+    const adminFileList = document.getElementById("adminFileList");
+    const adminLoginBtn = document.getElementById("adminLoginBtn");
+    const closeAdminBtn = document.getElementById("closeAdminBtn");
+
+    // Aufnahme starten
+    startBtn.addEventListener("click", async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorder = new MediaRecorder(stream);
@@ -37,55 +182,157 @@
           }
         };
 
-        mediaRecorder.onstop = async () => {
-          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-          const fileName = `podcast_${Date.now()}.webm`;
-
-          // Datei zu Supabase hochladen
-          await uploadToSupabase(audioBlob, fileName);
+        mediaRecorder.onstop = () => {
+          currentRecordingBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          const webmUrl = URL.createObjectURL(currentRecordingBlob);
+          audioPlayer.src = webmUrl;
+          uploadStatus.textContent = "Aufnahme bereit – bitte jetzt hochladen.";
+          uploadBtn.disabled = false; // Upload-Button aktivieren
         };
 
         mediaRecorder.start();
-        document.getElementById("startBtn").disabled = true;
-        document.getElementById("stopBtn").disabled = false;
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        uploadStatus.textContent = "Aufnahme läuft...";
       } catch (err) {
         alert("Mikrofon-Zugriff nicht erlaubt oder nicht verfügbar.");
         console.error(err);
       }
     });
 
-    // 3) Aufnahme stoppen
-    document.getElementById("stopBtn").addEventListener("click", () => {
+    // Aufnahme stoppen
+    stopBtn.addEventListener("click", () => {
       if (mediaRecorder) {
         mediaRecorder.stop();
-        document.getElementById("startBtn").disabled = false;
-        document.getElementById("stopBtn").disabled = true;
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
       }
     });
 
-    // 4) Upload-Funktion
-    async function uploadToSupabase(blob, fileName) {
-      // Im Bucket "podcast-audio" speichern
+    // Hochladen-Button: MP3-Konvertierung und Upload
+    uploadBtn.addEventListener("click", async () => {
+      if (!currentRecordingBlob) {
+        uploadStatus.textContent = "Keine Aufnahme vorhanden!";
+        return;
+      }
+      uploadStatus.textContent = "Aufnahme wird konvertiert und hochgeladen...";
+      await convertAndUpload(currentRecordingBlob);
+      // Nach dem Upload Aufnahme zurücksetzen
+      currentRecordingBlob = null;
+      uploadBtn.disabled = true;
+    });
+
+    // MP3-Konvertierung und Upload
+    async function convertAndUpload(webmBlob) {
+      // FFmpeg.js initialisieren
+      const ffmpeg = FFmpeg.createFFmpeg({ log: false });
+      await ffmpeg.load();
+      ffmpeg.FS('writeFile', 'aufnahme.webm', await webmBlob.arrayBuffer());
+      await ffmpeg.run('-i', 'aufnahme.webm', 'aufnahme.mp3');
+      const mp3Data = ffmpeg.FS('readFile', 'aufnahme.mp3');
+      const mp3Blob = new Blob([mp3Data.buffer], { type: 'audio/mp3' });
+
+      // Dateiname aus Input-Feld
+      let baseName = document.getElementById("filename").value.trim();
+      if (!baseName) {
+        baseName = "aufnahme_" + Date.now();
+      }
+      const fileName = baseName + ".mp3";
+
       const { data, error } = await supabaseClient
         .storage
         .from('podcast-audio')
-        .upload(fileName, blob, { contentType: 'audio/webm' });
+        .upload(fileName, mp3Blob, { contentType: 'audio/mp3' });
 
       if (error) {
         console.error("Upload-Fehler:", error);
-        document.getElementById("uploadStatus").innerText = "❌ Fehler beim Upload";
+        uploadStatus.textContent = "❌ Fehler beim Upload";
+        return;
+      }
+      uploadStatus.textContent = "✅ Erfolgreich hochgeladen als: " + fileName;
+      loadFiles(); // Aktualisiere die Dateiliste
+    }
+
+    // Dateiliste (für alle Nutzer) laden
+    async function loadFiles() {
+      fileList.innerHTML = "";
+      const { data, error } = await supabaseClient.storage
+        .from('podcast-audio')
+        .list('', { limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' } });
+      
+      if (error) {
+        console.error("Fehler beim Laden der Dateien:", error);
         return;
       }
 
-      // Download-Link abrufen
-      const { data: publicUrl } = supabaseClient
-        .storage
-        .from('podcast-audio')
-        .getPublicUrl(fileName);
-
-      document.getElementById("uploadStatus").innerHTML =
-        `✅ Hochgeladen: <a href="${publicUrl.publicUrl}" target="_blank">Podcast anhören</a>`;
+      data.forEach(file => {
+        const { data: publicUrl } = supabaseClient.storage
+          .from('podcast-audio')
+          .getPublicUrl(file.name);
+        const li = document.createElement('li');
+        li.innerHTML = `<a href="${publicUrl.publicUrl}" target="_blank">${file.name}</a>`;
+        fileList.appendChild(li);
+      });
     }
+
+    // Admin-Oberfläche laden (mit Download und Löschen)
+    async function loadAdminFiles() {
+      adminFileList.innerHTML = "";
+      const { data, error } = await supabaseClient.storage
+        .from('podcast-audio')
+        .list('', { limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' } });
+      
+      if (error) {
+        console.error("Fehler beim Laden der Admin-Dateien:", error);
+        return;
+      }
+
+      data.forEach(file => {
+        const { data: publicUrl } = supabaseClient.storage
+          .from('podcast-audio')
+          .getPublicUrl(file.name);
+        const li = document.createElement('li');
+        li.innerHTML = `<a href="${publicUrl.publicUrl}" target="_blank">${file.name}</a>
+                        <button class="delete" data-filename="${file.name}">Löschen</button>`;
+        adminFileList.appendChild(li);
+      });
+    }
+
+    // Event-Listener für Löschen in der Admin-Oberfläche
+    adminFileList.addEventListener("click", async (e) => {
+      if (e.target.classList.contains("delete")) {
+        const fileName = e.target.getAttribute("data-filename");
+        const { error } = await supabaseClient.storage
+          .from('podcast-audio')
+          .remove([fileName]);
+        if (error) {
+          alert("Fehler beim Löschen: " + error.message);
+        } else {
+          alert("Datei " + fileName + " wurde gelöscht.");
+          loadFiles();
+          loadAdminFiles();
+        }
+      }
+    });
+
+    // Admin-Login
+    adminLoginBtn.addEventListener("click", () => {
+      const pwd = prompt("Bitte Admin-Passwort eingeben:");
+      if (pwd === "sohran17") {
+        adminPanel.style.display = "block";
+        loadAdminFiles();
+      } else {
+        alert("Falsches Passwort!");
+      }
+    });
+
+    // Admin-Oberfläche schließen
+    closeAdminBtn.addEventListener("click", () => {
+      adminPanel.style.display = "none";
+    });
+
+    // Beim Laden der Seite Dateiliste abrufen
+    loadFiles();
   </script>
 </body>
 </html>
