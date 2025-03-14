@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Podcast Aufnahme – WebM mit Supabase</title>
+  <title>Podcast Aufnahme – iOS kompatibel</title>
 
   <!-- JSZip & FileSaver für „Alles herunterladen" -->
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -195,32 +195,13 @@
       background: #5E35B1;
     }
     
-    /* --- Audio Format Auswahl --- */
-    .audio-format-control {
-      display: flex;
-      flex-direction: column;
-      margin-bottom: 1.5rem;
-    }
-    
-    select {
-      padding: 0.75rem 1rem;
-      font-size: 1rem;
-      border: 2px solid #e0e0e0;
+    /* --- Audio Format Anzeige --- */
+    .format-info {
+      background-color: #f1f8e9;
       border-radius: 8px;
-      background-color: #fff;
-      -webkit-appearance: none;
-      appearance: none;
-      background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23131313%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
-      background-repeat: no-repeat;
-      background-position: right 1rem top 50%;
-      background-size: 0.65rem auto;
-      cursor: pointer;
-    }
-    
-    select:focus {
-      outline: none;
-      border-color: #4CAF50;
-      box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.2);
+      padding: 10px 15px;
+      margin-bottom: 1.5rem;
+      border-left: 4px solid #4CAF50;
     }
     
     /* --- Status-Anzeigen --- */
@@ -456,6 +437,15 @@
       margin-bottom: 0;
     }
     
+    /* iOS-spezifische Styles */
+    .ios-note {
+      background-color: #e3f2fd;
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1rem 0;
+      border-left: 4px solid #2196F3;
+    }
+    
     /* Verbesserte iPad-spezifische Styles */
     @media (max-width: 1024px) and (-webkit-min-device-pixel-ratio: 2), 
            (max-width: 1024px) and (min-resolution: 192dpi) {
@@ -492,20 +482,21 @@
       </ul>
     </div>
 
+    <!-- iOS-spezifischer Hinweis -->
+    <div class="ios-note" id="iosNote">
+      <h3>📱 Hinweis für iOS-Nutzer</h3>
+      <p>Diese App verwendet automatisch ein mit Ihrem Gerät kompatibles Audioformat. Es ist möglich, dass die Aufnahmequalität auf iOS-Geräten etwas geringer ist als auf Desktop-Browsern.</p>
+    </div>
+
     <!-- Aufnahme-Steuerung -->
     <div class="filename-input-container">
       <label for="filename" class="input-label">Dateiname (Pflicht)</label>
       <input type="text" id="filename" placeholder="Bitte Dateinamen eingeben" />
     </div>
 
-    <!-- Audio-Format Auswahl -->
-    <div class="audio-format-control">
-      <label for="audioFormat" class="input-label">Audio-Format</label>
-      <select id="audioFormat">
-        <option value="audio/webm">WebM (Standard)</option>
-        <option value="audio/ogg;codecs=opus">Ogg Opus</option>
-        <option value="audio/mpeg">MP3 (falls unterstützt)</option>
-      </select>
+    <!-- Audio-Format Info (kein Dropdown mehr für iOS) -->
+    <div class="format-info" id="formatInfo">
+      Aktuelles Format: <span id="currentFormat">Wird ermittelt...</span>
     </div>
 
     <div class="button-group">
@@ -558,7 +549,6 @@
         <h2>Verwendung</h2>
         <ol>
           <li>Geben Sie einen Dateinamen ein</li>
-          <li>Wählen Sie das gewünschte Audioformat</li>
           <li>Klicken Sie auf "Aufnahme starten"</li>
           <li>Sie können die Aufnahme pausieren und fortsetzen</li>
           <li>Nach dem Stoppen können Sie die Aufnahme anhören</li>
@@ -570,6 +560,7 @@
         <ul>
           <li><strong>Mikrofon funktioniert nicht:</strong> Prüfen Sie die Browsereinstellungen und erteilen Sie die Berechtigung für den Mikrofonzugriff.</li>
           <li><strong>Aufnahme startet nicht:</strong> Stellen Sie sicher, dass ein Dateiname eingegeben wurde.</li>
+          <li><strong>Probleme auf iOS:</strong> Starten Sie Safari neu oder verwenden Sie den Privatmodus, falls Sie Probleme haben.</li>
           <li><strong>Hochladen funktioniert nicht:</strong> Möglicherweise ist die Verbindung zum Server unterbrochen. Versuchen Sie es später erneut.</li>
         </ul>
       </div>
@@ -593,7 +584,7 @@
 
     // --- 1) SUPABASE KONFIG --- 
     // Diese Werte müssen korrekt gesetzt werden
-    const SUPABASE_URL = "https://qzmzlrsfuepbkqwzbrir.supabase.co"; // KORRIGIERT: Echte URL statt Platzhalter
+    const SUPABASE_URL = "https://qzmzlrsfuepbkqwzbrir.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6bXpscnNmdWVwYmtxd3picmlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE5NTkxMzAsImV4cCI6MjA1NzUzNTEzMH0.zLZDSfylloUxlxYPEpfO4VMAdf0cNpUzKH2T9qv8ezI";
     
     // Initialisiere Supabase Client
@@ -617,12 +608,13 @@
     let isPaused = false;
     let isRecording = false;
     
-    // Für die Anwendungseinstellungen
+    // Geräte- und Format-Erkennung
     const appSettings = {
       adminLoggedIn: false,
-      lastFormat: localStorage.getItem('preferredFormat') || 'audio/webm',
       lastFileName: localStorage.getItem('lastFileName') || '',
-      isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent)
+      isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent) || /Mac/.test(navigator.userAgent) && navigator.maxTouchPoints > 0,
+      isSafari: /^((?!chrome|android).)*safari/i.test(navigator.userAgent),
+      bestAudioFormat: 'audio/mp4' // Standard-Fallback für iOS
     };
 
     // --- 3) DOM-Elemente ---
@@ -643,13 +635,26 @@
     const downloadAllBtn   = document.getElementById("downloadAllBtn");
     const timerDisplay     = document.getElementById("timerDisplay");
     const recordingStatus  = document.getElementById("recordingStatus");
-    const audioFormat      = document.getElementById("audioFormat");
+    const formatInfo       = document.getElementById("formatInfo");
+    const currentFormat    = document.getElementById("currentFormat");
+    const microphoneWarning = document.getElementById("microphoneWarning");
+    const iosNote          = document.getElementById("iosNote");
     const tabButtons       = document.querySelectorAll(".tab-button");
     const tabContents      = document.querySelectorAll(".tab-content");
-    const microphoneWarning = document.getElementById("microphoneWarning");
 
     // --- 4) Initialisierung ---
-    function init() {
+    async function init() {
+      // Debug-Info für bessere Fehlerbehebung
+      console.log("Browser-Info:", navigator.userAgent);
+      console.log("Geräteerkennung - iOS:", appSettings.isIOS, "Safari:", appSettings.isSafari);
+      
+      // iOS-spezifische Anzeige
+      if (appSettings.isIOS) {
+        iosNote.style.display = "block";
+      } else {
+        iosNote.style.display = "none";
+      }
+      
       // Lade gespeicherte Einstellungen aus dem LocalStorage
       if (appSettings.lastFileName) {
         filenameInput.value = appSettings.lastFileName;
@@ -658,19 +663,11 @@
       // Immer validateFileName ausführen, um den Button-Status zu aktualisieren
       validateFileName();
       
-      if (appSettings.lastFormat) {
-        audioFormat.value = appSettings.lastFormat;
-      }
-      
       // Prüfe Browser-Unterstützung
-      checkBrowserSupport();
+      if (!checkBrowserSupport()) return;
       
-      // Warnungen für iOS-Geräte
-      if (appSettings.isIOS) {
-        console.log("iOS-Gerät erkannt, spezielle Konfiguration wird angewendet");
-        // Auf iOS werden zusätzliche Berechtigungen benötigt
-        microphoneWarning.style.display = "block";
-      }
+      // Bestimme das beste Audio-Format für diesen Browser
+      await determineOptimalAudioFormat();
       
       // Lade vorhandene Dateien mit Fehlerbehandlung
       loadFilesWithRetry();
@@ -680,8 +677,6 @@
       
       // Prüfe, ob es eine gespeicherte Aufnahme gibt
       checkForSavedRecording();
-      
-      console.log("Anwendung initialisiert. iOS:", appSettings.isIOS);
     }
 
     // --- 5) Browser-Unterstützung prüfen ---
@@ -693,16 +688,74 @@
       }
       return true;
     }
+    
+    // --- Neuer Schritt: Beste Audio-Format-Erkennung ---
+    async function determineOptimalAudioFormat() {
+      // Für iOS-Geräte werden wir diese Formate in dieser Reihenfolge testen
+      const formatsToTest = [
+        'audio/mp4',
+        'audio/aac',
+        'audio/wav',
+        'audio/mpeg',
+        'audio/webm;codecs=pcm',
+        'audio/webm'
+      ];
+      
+      let foundFormat = false;
+      
+      // Standardwert anzeigen während wir testen
+      currentFormat.textContent = "Wird geprüft...";
+      
+      for (const format of formatsToTest) {
+        if (MediaRecorder.isTypeSupported(format)) {
+          console.log(`Format ${format} wird unterstützt!`);
+          appSettings.bestAudioFormat = format;
+          currentFormat.textContent = formatReadableName(format);
+          foundFormat = true;
+          break;
+        } else {
+          console.log(`Format ${format} wird nicht unterstützt.`);
+        }
+      }
+      
+      if (!foundFormat) {
+        // Wenn kein getestetes Format unterstützt wird, verwenden wir den Standard-MediaRecorder ohne expliziten mimeType
+        currentFormat.textContent = "Standard (geräteabhängig)";
+        console.warn("Kein bekanntes Format wird unterstützt. Verwende Standard-Format des Browsers.");
+        appSettings.bestAudioFormat = '';
+      }
+    }
+    
+    function formatReadableName(mimeType) {
+      const formatMap = {
+        'audio/mp4': 'MP4 Audio',
+        'audio/aac': 'AAC Audio',
+        'audio/wav': 'WAV Audio',
+        'audio/mpeg': 'MP3 Audio',
+        'audio/webm': 'WebM Audio',
+        'audio/webm;codecs=pcm': 'WebM PCM Audio'
+      };
+      
+      return formatMap[mimeType] || mimeType;
+    }
+    
+    function getFileExtension(mimeType) {
+      const extensionMap = {
+        'audio/mp4': '.m4a',
+        'audio/aac': '.aac',
+        'audio/wav': '.wav',
+        'audio/mpeg': '.mp3',
+        'audio/webm': '.webm',
+        'audio/webm;codecs=pcm': '.webm'
+      };
+      
+      return extensionMap[mimeType] || '.m4a'; // Standardmäßig .m4a für iOS
+    }
 
     // --- 6) Event Listeners ---
     function setupEventListeners() {
       // Dateiname-Validierung
       filenameInput.addEventListener("input", validateFileName);
-      
-      // Format-Änderung
-      audioFormat.addEventListener("change", () => {
-        localStorage.setItem('preferredFormat', audioFormat.value);
-      });
       
       // Aufnahme-Steuerung
       startBtn.addEventListener("click", startRecording);
@@ -802,19 +855,35 @@
           }
         }
         
-        // Prüfe, ob das gewählte Format unterstützt wird
-        const selectedFormat = audioFormat.value;
-        const options = { mimeType: selectedFormat };
+        // MediaRecorder initialisieren
+        let recorderOptions = {};
         
-        // Prüfe, ob das Format unterstützt wird
-        if (!MediaRecorder.isTypeSupported(selectedFormat)) {
-          showWarning(`Format ${selectedFormat} wird nicht unterstützt. Fallback auf WebM.`);
-          options.mimeType = "audio/webm";
-          audioFormat.value = "audio/webm";
+        // Verwende das beste erkannte Format, wenn verfügbar
+        if (appSettings.bestAudioFormat) {
+          recorderOptions.mimeType = appSettings.bestAudioFormat;
+          console.log(`Verwende Format: ${appSettings.bestAudioFormat}`);
+        } else {
+          console.log("Verwende Standard-Format des Browsers");
         }
         
-        // MediaRecorder initialisieren
-        mediaRecorder = new MediaRecorder(audioStream, options);
+        try {
+          mediaRecorder = new MediaRecorder(audioStream, recorderOptions);
+        } catch (formatError) {
+          console.error("Format wird nicht unterstützt:", formatError);
+          console.log("Versuche ohne mimeType-Angabe...");
+          mediaRecorder = new MediaRecorder(audioStream);
+          
+          // Update formatInfo-Anzeige
+          currentFormat.textContent = "Standard (geräteabhängig)";
+        }
+        
+        // MediaRecorder-Format anzeigen
+        if (mediaRecorder.mimeType) {
+          currentFormat.textContent = formatReadableName(mediaRecorder.mimeType);
+          console.log("Tatsächlich verwendetes Format:", mediaRecorder.mimeType);
+          appSettings.bestAudioFormat = mediaRecorder.mimeType;
+        }
+        
         audioChunks = [];
         
         // Event Handling
@@ -827,7 +896,7 @@
         };
         
         // Aufnahme starten
-        mediaRecorder.start(1000); // Chunks alle 1 Sekunde
+        mediaRecorder.start(100); // Chunks alle 100ms für bessere iOS-Kompatibilität
         isRecording = true;
         isPaused = false;
         
@@ -851,24 +920,37 @@
     // --- 9) Aufnahme pausieren ---
     function pauseRecording() {
       if (mediaRecorder && mediaRecorder.state === "recording") {
-        mediaRecorder.pause();
-        isPaused = true;
-        pauseTimer();
-        pauseVisualizer();
-        updateRecordingUI(true, true);
-        showMessage("Aufnahme pausiert", false);
+        try {
+          mediaRecorder.pause();
+          isPaused = true;
+          pauseTimer();
+          pauseVisualizer();
+          updateRecordingUI(true, true);
+          showMessage("Aufnahme pausiert", false);
+        } catch (error) {
+          console.error("Fehler beim Pausieren:", error);
+          // Wenn pausieren auf iOS fehlschlägt, bieten wir an, stattdessen zu stoppen
+          if (appSettings.isIOS) {
+            showWarning("Pausieren wird auf einigen iOS-Geräten nicht unterstützt. Bitte stoppen Sie die Aufnahme, wenn Sie fertig sind.");
+          }
+        }
       }
     }
     
     // --- 10) Aufnahme fortsetzen ---
     function resumeRecording() {
       if (mediaRecorder && mediaRecorder.state === "paused") {
-        mediaRecorder.resume();
-        isPaused = false;
-        resumeTimer();
-        resumeVisualizer();
-        updateRecordingUI(true, false);
-        showMessage("Aufnahme fortgesetzt", true);
+        try {
+          mediaRecorder.resume();
+          isPaused = false;
+          resumeTimer();
+          resumeVisualizer();
+          updateRecordingUI(true, false);
+          showMessage("Aufnahme fortgesetzt", true);
+        } catch (error) {
+          console.error("Fehler beim Fortsetzen:", error);
+          showWarning("Es gab ein Problem beim Fortsetzen der Aufnahme. Versuchen Sie, die Aufnahme zu stoppen und neu zu starten.");
+        }
       }
     }
 
@@ -890,6 +972,17 @@
         } catch (error) {
           console.error("Fehler beim Stoppen der Aufnahme:", error);
           showError("Fehler beim Stoppen der Aufnahme. Bitte laden Sie die Seite neu.");
+          
+          // Notfall-Reset falls das Stoppen nicht funktioniert
+          isRecording = false;
+          isPaused = false;
+          stopTimer();
+          stopVisualizer();
+          updateRecordingUI(false);
+          
+          if (audioStream) {
+            audioStream.getTracks().forEach(track => track.stop());
+          }
         }
       }
     }
@@ -906,7 +999,7 @@
     function handleRecordingStop() {
       try {
         // Erstelle Blob aus gesammelten Daten
-        const mimeType = audioFormat.value;
+        const mimeType = appSettings.bestAudioFormat || 'audio/mp4';
         currentRecordingBlob = new Blob(audioChunks, { type: mimeType });
         
         // Audio-Player aktualisieren
@@ -920,7 +1013,7 @@
         // Lokale Kopie speichern
         saveRecording(currentRecordingBlob, mimeType);
         
-        console.log("Aufnahme erfolgreich gestoppt. Größe:", formatBytes(currentRecordingBlob.size));
+        console.log("Aufnahme erfolgreich gestoppt. Größe:", formatBytes(currentRecordingBlob.size), "Format:", mimeType);
       } catch (error) {
         console.error("Fehler beim Verarbeiten der Aufnahme:", error);
         showError("Fehler beim Verarbeiten der Aufnahme: " + error.message);
@@ -947,29 +1040,14 @@
       
       // Dateinamen vorbereiten
       let baseName = filenameInput.value.trim();
-      const mimeType = audioFormat.value;
-      let extension;
-      
-      // Dateiendung basierend auf MIME-Typ festlegen
-      switch (mimeType) {
-        case "audio/webm":
-          extension = ".webm";
-          break;
-        case "audio/ogg;codecs=opus":
-          extension = ".ogg";
-          break;
-        case "audio/mpeg":
-          extension = ".mp3";
-          break;
-        default:
-          extension = ".webm";
-      }
+      const mimeType = appSettings.bestAudioFormat || 'audio/mp4';
+      let extension = getFileExtension(mimeType);
       
       // Dateinamen mit Endung erstellen
       const fileName = baseName + extension;
       
       try {
-        console.log("Upload starten: Datei", fileName, "Größe:", formatBytes(currentRecordingBlob.size));
+        console.log("Upload starten: Datei", fileName, "Größe:", formatBytes(currentRecordingBlob.size), "Format:", mimeType);
         
         // Auf Supabase hochladen mit Wiederholungslogik
         const uploadWithRetry = async (retries = 3) => {
