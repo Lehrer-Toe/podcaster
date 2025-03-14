@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Podcast Aufnahme – WebM mit Supabase</title>
 
   <!-- JSZip & FileSaver für „Alles herunterladen" -->
@@ -10,322 +10,261 @@
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
 
   <style>
+    /* --- Allgemeine Styles --- */
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
     body {
       margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f4f4f4;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #f8f9fa;
       color: #333;
-    // --- 19) Visualizer Funktionen ---
-    function startVisualizer(stream) {
-      // AudioContext erstellen
-      audioContext = new AudioContext();
-      const source = audioContext.createMediaStreamSource(stream);
-      analyser = audioContext.createAnalyser();
-      analyser.fftSize = 1024;
-      source.connect(analyser);
-      dataArray = new Uint8Array(analyser.frequencyBinCount);
-      
-      // Visualizer starten
-      animateVisualizer();
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
     
-    function animateVisualizer() {
-      if (!analyser) return;
-      
-      animationId = requestAnimationFrame(animateVisualizer);
-      analyser.getByteTimeDomainData(dataArray);
-      
-      // RMS (Root Mean Square) Berechnung für Lautstärke
-      let sum = 0;
-      for (let i = 0; i < dataArray.length; i++) {
-        const val = dataArray[i] - 128;
-        sum += val * val;
-      }
-      
-      const rms = Math.sqrt(sum / dataArray.length);
-      const size = 40 + rms; // Basisgröße + Lautstärke
-      
-      // Kreisgröße aktualisieren
-      visualizerCircle.style.width = size + "px";
-      visualizerCircle.style.height = size + "px";
-    }
-    
-    function pauseVisualizer() {
-      if (animationId) {
-        cancelAnimationFrame(animationId);
-        animationId = null;
-      }
-    }
-    
-    function resumeVisualizer() {
-      if (audioContext && analyser) {
-        animateVisualizer();
-      }
-    }
-    
-    function stopVisualizer() {
-      if (animationId) {
-        cancelAnimationFrame(animationId);
-        animationId = null;
-      }
-      
-      if (audioContext) {
-        audioContext.close();
-        audioContext = null;
-      }
-      
-      // Kreisgröße zurücksetzen
-      visualizerCircle.style.width = "40px";
-      visualizerCircle.style.height = "40px";
-    }
-
-    // --- 20) Timer Funktionen ---
-    function startTimer() {
-      recordingTime = 0;
-      updateTimerDisplay(0);
-      recordingInterval = setInterval(() => {
-        recordingTime++;
-        updateTimerDisplay(recordingTime);
-      }, 1000);
-    }
-    
-    function pauseTimer() {
-      if (recordingInterval) {
-        clearInterval(recordingInterval);
-        recordingInterval = null;
-      }
-    }
-    
-    function resumeTimer() {
-      if (!recordingInterval) {
-        recordingInterval = setInterval(() => {
-          recordingTime++;
-          updateTimerDisplay(recordingTime);
-        }, 1000);
-      }
-    }
-    
-    function stopTimer() {
-      if (recordingInterval) {
-        clearInterval(recordingInterval);
-        recordingInterval = null;
-      }
-    }
-    
-    function updateTimerDisplay(seconds) {
-      const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
-      const ss = String(seconds % 60).padStart(2, "0");
-      timerDisplay.textContent = `${mm}:${ss}`;
-    }
-
-    // --- 21) UI-Hilfsfunktionen ---
-    function updateRecordingUI(isActive, isPaused = false) {
-      // Aufnahme aktiv
-      if (isActive) {
-        startBtn.disabled = true;
-        stopBtn.disabled = false;
-        
-        // Pause-Status
-        if (isPaused) {
-          pauseBtn.disabled = true;
-          resumeBtn.disabled = false;
-          recordingStatus.innerHTML = '<span class="status-icon">⏸️</span> Aufnahme pausiert';
-        } else {
-          pauseBtn.disabled = false;
-          resumeBtn.disabled = true;
-          recordingStatus.innerHTML = '<span class="recording-indicator"></span> Aufnahme läuft';
-        }
-      } 
-      // Aufnahme inaktiv
-      else {
-        startBtn.disabled = false;
-        pauseBtn.disabled = true;
-        resumeBtn.disabled = true;
-        stopBtn.disabled = true;
-        recordingStatus.innerHTML = '';
-      }
-    }
-    
-    function showMessage(message, isRecording = false) {
-      if (isRecording) {
-        uploadStatus.innerHTML = `<span class="recording-indicator"></span> ${message}`;
-      } else {
-        uploadStatus.textContent = message;
-      }
-    }
-    
-    function showError(message) {
-      uploadStatus.innerHTML = `<span class="error-message">❌ ${message}</span>`;
-      console.error(message);
-    }
-    
-    function showWarning(message) {
-      uploadStatus.innerHTML = `<span style="color: #FF9800;">⚠️ ${message}</span>`;
-      console.warn(message);
-    }
-    
-    function showSuccess(message) {
-      uploadStatus.innerHTML = `<span class="success-message">${message}</span>`;
-    }
-    
-    // --- 22) Lokale Speicherung ---
-    function saveRecording(blob, mimeType) {
-      try {
-        // In IndexedDB speichern (vereinfacht mit localStorage)
-        localStorage.setItem('lastRecordingMimeType', mimeType);
-        
-        // Blob als Base64 speichern
-        const reader = new FileReader();
-        reader.readAsDataURL(blob);
-        reader.onloadend = function() {
-          const base64data = reader.result;
-          localStorage.setItem('lastRecordingData', base64data);
-        };
-      } catch (err) {
-        console.warn("Konnte Aufnahme nicht lokal speichern:", err);
-      }
-    }
-    
-    // Speichert aktuelle Audiochunks (für Wiederherstellung)
-    function saveRecordingChunks() {
-      // Wir speichern hier nicht die Chunks selbst, da das zu viel wäre
-      // Stattdessen markieren wir, dass eine Aufnahme läuft
-      if (isRecording) {
-        localStorage.setItem('recordingInProgress', 'true');
-      }
-    }
-    
-    function clearSavedRecording() {
-      localStorage.removeItem('lastRecordingData');
-      localStorage.removeItem('lastRecordingMimeType');
-      localStorage.removeItem('recordingInProgress');
-    }
-    
-    function checkForSavedRecording() {
-      const savedRecording = localStorage.getItem('lastRecordingData');
-      const savedMimeType = localStorage.getItem('lastRecordingMimeType');
-      
-      if (savedRecording && savedMimeType) {
-        // Vorherige Aufnahme wiederherstellen
-        try {
-          // Base64 in Blob umwandeln
-          const byteString = atob(savedRecording.split(',')[1]);
-          const ab = new ArrayBuffer(byteString.length);
-          const ia = new Uint8Array(ab);
-          
-          for (let i = 0; i < byteString.length; i++) {
-            ia[i] = byteString.charCodeAt(i);
-          }
-          
-          currentRecordingBlob = new Blob([ab], { type: savedMimeType });
-          const audioUrl = URL.createObjectURL(currentRecordingBlob);
-          audioPlayer.src = audioUrl;
-          
-          // UI aktualisieren
-          uploadBtn.disabled = false;
-          showMessage("Gespeicherte Aufnahme geladen. Sie können sie hochladen oder eine neue erstellen.");
-        } catch (err) {
-          console.warn("Fehler beim Laden der gespeicherten Aufnahme:", err);
-          clearSavedRecording();
-        }
-      }
-      
-      // Prüfe, ob eine Aufnahme unterbrochen wurde
-      const inProgress = localStorage.getItem('recordingInProgress');
-      if (inProgress === 'true') {
-        showWarning("Eine frühere Aufnahme wurde unterbrochen. Bitte starten Sie eine neue Aufnahme.");
-        localStorage.removeItem('recordingInProgress');
-      }
-    }
-    
-    // --- 23) Hilfsfunktionen ---
-    function formatBytes(bytes, decimals = 2) {
-      if (bytes === 0) return '0 Bytes';
-      
-      const k = 1024;
-      const dm = decimals < 0 ? 0 : decimals;
-      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-      
-      const i = Math.floor(Math.log(bytes) / Math.log(k));
-      
-      return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-    }
-    
-    // --- 24) Initialisierung starten ---
-    init();
-  </script>
-</body>
-</html>
+    /* --- Header --- */
     header {
-      background: #4CAF50;
+      background: linear-gradient(135deg, #4CAF50, #2E7D32);
       color: #fff;
-      padding: 1rem;
+      padding: 1.5rem;
       text-align: center;
+      box-shadow: 0 2px 15px rgba(0,0,0,0.1);
     }
+    
+    /* --- Container --- */
     .container {
-      max-width: 600px;
+      max-width: 700px;
       margin: 2rem auto;
       background: #fff;
-      padding: 1.5rem;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.06);
     }
+    
+    @media (max-width: 768px) {
+      .container {
+        margin: 1rem;
+        padding: 1.5rem;
+      }
+    }
+    
     h1 {
       margin-top: 0;
-      font-size: 1.5rem;
+      font-size: 1.8rem;
+      font-weight: 600;
     }
-    .record-controls {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.5rem;
+    
+    h2 {
+      font-size: 1.4rem;
       margin-bottom: 1rem;
+      color: #2E7D32;
     }
+    
+    /* --- Aufnahme-Controls --- */
+    .record-controls {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    @media (min-width: 600px) {
+      .record-controls {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    
+    .filename-input-container {
+      position: relative;
+      grid-column: 1 / -1;
+    }
+    
     input[type="text"] {
-      padding: 0.4rem;
-      flex: 1;
-    }
-    select {
-      padding: 0.4rem;
-    }
-    button {
-      padding: 0.6rem 1rem;
+      width: 100%;
+      padding: 0.75rem 1rem;
       font-size: 1rem;
-      margin: 0.3rem;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #4CAF50;
+      box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.2);
+    }
+    
+    .input-label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+      color: #444;
+    }
+    
+    /* --- Button Styles --- */
+    button {
+      padding: 0.75rem 1rem;
+      font-size: 1rem;
+      font-weight: 500;
       cursor: pointer;
       border: none;
-      border-radius: 4px;
-      background: #4CAF50;
+      border-radius: 8px;
       color: #fff;
-      transition: background 0.2s ease;
+      background: #4CAF50;
+      transition: all 0.2s ease;
+      -webkit-appearance: none;
+      appearance: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px; /* Für bessere Touch-Ziele auf iPads */
     }
-    button:hover {
+    
+    button:hover:not(:disabled) {
       background: #45a049;
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px rgba(0,0,0,0.1);
     }
+    
+    button:active:not(:disabled) {
+      transform: translateY(0);
+    }
+    
     button:disabled {
-      background: #cccccc;
+      background: #e0e0e0;
+      color: #999;
       cursor: not-allowed;
     }
+    
+    button:focus {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.3);
+    }
+    
+    /* --- Spezielle Button-Typen --- */
+    #startBtn {
+      background: #4CAF50;
+    }
+    
+    #startBtn:hover:not(:disabled) {
+      background: #3e9142;
+    }
+    
+    #pauseBtn {
+      background: #FF9800;
+    }
+    
+    #pauseBtn:hover:not(:disabled) {
+      background: #F57C00;
+    }
+    
+    #resumeBtn {
+      background: #2196F3;
+    }
+    
+    #resumeBtn:hover:not(:disabled) {
+      background: #1976D2;
+    }
+    
+    #stopBtn {
+      background: #f44336;
+    }
+    
+    #stopBtn:hover:not(:disabled) {
+      background: #d32f2f;
+    }
+    
+    #uploadBtn {
+      background: #673AB7;
+    }
+    
+    #uploadBtn:hover:not(:disabled) {
+      background: #5E35B1;
+    }
+    
+    /* --- Audio Format Auswahl --- */
+    .audio-format-control {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 1.5rem;
+    }
+    
+    select {
+      padding: 0.75rem 1rem;
+      font-size: 1rem;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      background-color: #fff;
+      -webkit-appearance: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23131313%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+      background-repeat: no-repeat;
+      background-position: right 1rem top 50%;
+      background-size: 0.65rem auto;
+      cursor: pointer;
+    }
+    
+    select:focus {
+      outline: none;
+      border-color: #4CAF50;
+      box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.2);
+    }
+    
+    /* --- Status-Anzeigen --- */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding: 0.5rem 0;
+      min-height: 2rem;
+    }
+    
+    #timerDisplay {
+      text-align: center;
+      font-size: 2rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      color: #2E7D32;
+    }
+    
+    /* --- Audio Player --- */
     audio {
       width: 100%;
-      margin: 1rem 0;
+      margin: 1.5rem 0;
+      border-radius: 8px;
     }
+    
     #uploadStatus {
       margin: 1rem 0;
-      font-weight: bold;
+      font-weight: 500;
+      padding: 0.75rem;
+      border-radius: 8px;
+      background: #f5f5f5;
+      min-height: 3rem;
+      display: flex;
+      align-items: center;
     }
+    
+    /* --- Visualizer --- */
     .visualizer-container {
       position: relative;
       width: 200px;
       height: 200px;
       margin: 20px auto 40px auto;
-      border: 2px solid #ccc;
-      border-radius: 8px;
+      border: 2px solid #e0e0e0;
+      border-radius: 50%;
       background: #fafafa;
       display: flex;
       align-items: center;
       justify-content: center;
+      box-shadow: inset 0 2px 10px rgba(0,0,0,0.05);
     }
+    
     .visualizer-circle {
       position: absolute;
       width: 40px;
@@ -333,49 +272,123 @@
       background: #f44336;
       border-radius: 50%;
       transition: width 0.1s, height 0.1s;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.2);
     }
-    #timerDisplay {
-      text-align: center;
-      font-size: 1.2rem;
-      font-weight: bold;
-      margin-bottom: 1rem;
+    
+    /* --- Tabs --- */
+    .tab-container {
+      margin-top: 2.5rem;
     }
+    
+    .tab-buttons {
+      display: flex;
+      border-bottom: 2px solid #e0e0e0;
+      margin-bottom: 1.5rem;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    .tab-button {
+      background: transparent;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      margin-right: 0.5rem;
+      border-radius: 8px 8px 0 0;
+      cursor: pointer;
+      color: #666;
+      font-weight: 500;
+      min-width: auto;
+    }
+    
+    .tab-button.active {
+      background: #4CAF50;
+      color: white;
+    }
+    
+    .tab-content {
+      display: none;
+      padding: 1rem 0;
+    }
+    
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    /* --- Dateien-Liste --- */
     .file-list, .admin-panel {
       margin-top: 2rem;
     }
+    
     .file-list h2, .admin-panel h2 {
-      margin-bottom: 0.5rem;
+      margin-bottom: 1rem;
     }
+    
     .file-list ul, .admin-panel ul {
       list-style: none;
       padding-left: 0;
       margin: 0;
     }
+    
     .file-list li, .admin-panel li {
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.75rem;
       display: flex;
       align-items: center;
-      gap: 1rem;
+      padding: 0.75rem;
+      border-radius: 8px;
+      background: #f8f9fa;
+      transition: all 0.2s ease;
     }
+    
+    .file-list li:hover, .admin-panel li:hover {
+      background: #f0f0f0;
+    }
+    
     .file-list a, .admin-panel a {
       color: #4CAF50;
       text-decoration: none;
+      flex: 1;
+      padding: 0.25rem 0;
     }
+    
     .file-list a:hover, .admin-panel a:hover {
       text-decoration: underline;
     }
+    
+    /* --- Admin Panel --- */
     .admin-panel {
       display: none;
-      border-top: 1px solid #ccc;
-      padding-top: 1rem;
+      border-top: 1px solid #e0e0e0;
+      padding-top: 1.5rem;
       margin-top: 2rem;
     }
+    
     .admin-panel button.delete {
-      background: #d9534f;
+      background: #f44336;
+      padding: 0.5rem 0.75rem;
+      margin-left: 0.75rem;
+      font-size: 0.9rem;
     }
+    
     .admin-panel button.delete:hover {
-      background: #c9302c;
+      background: #d32f2f;
     }
+    
+    #adminLoginBtn {
+      background: #333;
+      margin-top: 2rem;
+    }
+    
+    #closeAdminBtn {
+      background: #333;
+    }
+    
+    /* --- Indikatoren und Animationen --- */
     .recording-indicator {
       display: inline-block;
       width: 12px;
@@ -385,80 +398,53 @@
       margin-right: 8px;
       animation: blink 1s infinite;
     }
+    
     @keyframes blink {
       0% { opacity: 1; }
       50% { opacity: 0.3; }
       100% { opacity: 1; }
     }
-    .status-bar {
-      display: flex;
-      align-items: center;
-      margin-bottom: 1rem;
-    }
+    
     .status-icon {
       margin-right: 5px;
     }
-    .audio-format-control {
-      display: flex;
-      margin-bottom: 1rem;
-      align-items: center;
-    }
-    .audio-format-control label {
-      margin-right: 1rem;
-    }
-    .tab-container {
-      margin-top: 2rem;
-    }
-    .tab-buttons {
-      display: flex;
-      border-bottom: 1px solid #ccc;
-    }
-    .tab-button {
-      background: #e9e9e9;
-      border: none;
-      padding: 10px 20px;
-      margin-right: 5px;
-      border-radius: 5px 5px 0 0;
-      cursor: pointer;
-    }
-    .tab-button.active {
-      background: #4CAF50;
-      color: white;
-    }
-    .tab-content {
-      display: none;
-      padding: 20px 10px;
-    }
-    .tab-content.active {
-      display: block;
-    }
+    
     .pulse {
       animation: pulse 2s infinite;
     }
+    
     @keyframes pulse {
       0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); }
       70% { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
       100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
     }
-    #pauseBtn {
-      background: #FF9800;
-    }
-    #pauseBtn:hover {
-      background: #F57C00;
-    }
-    #resumeBtn {
-      background: #2196F3;
-    }
-    #resumeBtn:hover {
-      background: #1976D2;
-    }
+    
     .error-message {
-      color: #d9534f;
-      font-weight: bold;
+      color: #f44336;
+      font-weight: 500;
     }
+    
     .success-message {
       color: #4CAF50;
-      font-weight: bold;
+      font-weight: 500;
+    }
+    
+    /* Verbesserte iPad-spezifische Styles */
+    @media (max-width: 1024px) and (-webkit-min-device-pixel-ratio: 2), 
+           (max-width: 1024px) and (min-resolution: 192dpi) {
+      button, input, select {
+        font-size: 1.1rem;
+        padding: 0.85rem 1rem;
+      }
+      
+      h1 {
+        font-size: 2rem;
+      }
+      
+      .visualizer-container {
+        width: 180px;
+        height: 180px;
+      }
     }
   </style>
 </head>
@@ -470,8 +456,11 @@
   <div class="container">
     <!-- Aufnahme-Steuerung -->
     <div class="record-controls">
-      <input type="text" id="filename" placeholder="Dateiname (Pflicht!)" />
-      <button id="startBtn" disabled>Aufnahme starten</button>
+      <div class="filename-input-container">
+        <label for="filename" class="input-label">Dateiname (Pflicht)</label>
+        <input type="text" id="filename" placeholder="Bitte Dateinamen eingeben" />
+      </div>
+      <button id="startBtn">Aufnahme starten</button>
       <button id="pauseBtn" disabled>Pausieren</button>
       <button id="resumeBtn" disabled>Fortsetzen</button>
       <button id="stopBtn" disabled>Stoppen</button>
@@ -480,7 +469,7 @@
 
     <!-- Audio-Format Auswahl -->
     <div class="audio-format-control">
-      <label for="audioFormat">Audio-Format:</label>
+      <label for="audioFormat" class="input-label">Audio-Format</label>
       <select id="audioFormat">
         <option value="audio/webm">WebM (Standard)</option>
         <option value="audio/ogg;codecs=opus">Ogg Opus</option>
@@ -516,14 +505,14 @@
       <div class="tab-content active" id="recordings-tab">
         <!-- Öffentliche Dateiliste -->
         <div class="file-list">
-          <h2>Vorhandene Aufnahmen:</h2>
+          <h2>Vorhandene Aufnahmen</h2>
           <ul id="fileList"></ul>
         </div>
       </div>
       
       <!-- Hilfe Tab -->
       <div class="tab-content" id="help-tab">
-        <h2>Verwendung:</h2>
+        <h2>Verwendung</h2>
         <ol>
           <li>Geben Sie einen Dateinamen ein</li>
           <li>Wählen Sie das gewünschte Audioformat</li>
@@ -539,13 +528,13 @@
     <!-- Admin-Oberfläche -->
     <div class="admin-panel" id="adminPanel">
       <h2>Admin-Oberfläche</h2>
-      <button id="downloadAllBtn" style="background:#555;">Alles herunterladen</button>
+      <button id="downloadAllBtn">Alles herunterladen</button>
       <ul id="adminFileList"></ul>
-      <button id="closeAdminBtn" style="background:#333;">Admin schließen</button>
+      <button id="closeAdminBtn">Admin schließen</button>
     </div>
 
     <!-- Admin-Login Button -->
-    <button id="adminLoginBtn" style="background:#333;">Admin Login</button>
+    <button id="adminLoginBtn">Admin Login</button>
   </div>
 
   <!-- Supabase (ES-Modul) -->
@@ -613,7 +602,7 @@
       // Lade gespeicherte Einstellungen aus dem LocalStorage
       if (appSettings.lastFileName) {
         filenameInput.value = appSettings.lastFileName;
-        validateFileName();
+        validateFileName(); // Wichtig: Hier wurde ein Bug behoben!
       }
       
       if (appSettings.lastFormat) {
@@ -696,6 +685,9 @@
       } else {
         startBtn.disabled = true;
       }
+
+      // Debug-Information zur Hilfe
+      console.log("Dateiname validiert:", filename, "Start-Button aktiviert:", !startBtn.disabled);
     }
 
     // --- 8) Aufnahme starten ---
@@ -1108,3 +1100,245 @@
         showError("Fehler beim ZIP-Erstellen: " + err.message);
       }
     }
+
+    // --- 19) Visualizer Funktionen ---
+    function startVisualizer(stream) {
+      // AudioContext erstellen
+      audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(stream);
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 1024;
+      source.connect(analyser);
+      dataArray = new Uint8Array(analyser.frequencyBinCount);
+      
+      // Visualizer starten
+      animateVisualizer();
+    }
+    
+    function animateVisualizer() {
+      if (!analyser) return;
+      
+      animationId = requestAnimationFrame(animateVisualizer);
+      analyser.getByteTimeDomainData(dataArray);
+      
+      // RMS (Root Mean Square) Berechnung für Lautstärke
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        const val = dataArray[i] - 128;
+        sum += val * val;
+      }
+      
+      const rms = Math.sqrt(sum / dataArray.length);
+      const size = 40 + rms; // Basisgröße + Lautstärke
+      
+      // Kreisgröße aktualisieren
+      visualizerCircle.style.width = size + "px";
+      visualizerCircle.style.height = size + "px";
+    }
+    
+    function pauseVisualizer() {
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+    }
+    
+    function resumeVisualizer() {
+      if (audioContext && analyser) {
+        animateVisualizer();
+      }
+    }
+    
+    function stopVisualizer() {
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+      
+      if (audioContext) {
+        audioContext.close();
+        audioContext = null;
+      }
+      
+      // Kreisgröße zurücksetzen
+      visualizerCircle.style.width = "40px";
+      visualizerCircle.style.height = "40px";
+    }
+
+    // --- 20) Timer Funktionen ---
+    function startTimer() {
+      recordingTime = 0;
+      updateTimerDisplay(0);
+      recordingInterval = setInterval(() => {
+        recordingTime++;
+        updateTimerDisplay(recordingTime);
+      }, 1000);
+    }
+    
+    function pauseTimer() {
+      if (recordingInterval) {
+        clearInterval(recordingInterval);
+        recordingInterval = null;
+      }
+    }
+    
+    function resumeTimer() {
+      if (!recordingInterval) {
+        recordingInterval = setInterval(() => {
+          recordingTime++;
+          updateTimerDisplay(recordingTime);
+        }, 1000);
+      }
+    }
+    
+    function stopTimer() {
+      if (recordingInterval) {
+        clearInterval(recordingInterval);
+        recordingInterval = null;
+      }
+    }
+    
+    function updateTimerDisplay(seconds) {
+      const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
+      const ss = String(seconds % 60).padStart(2, "0");
+      timerDisplay.textContent = `${mm}:${ss}`;
+    }
+
+    // --- 21) UI-Hilfsfunktionen ---
+    function updateRecordingUI(isActive, isPaused = false) {
+      // Aufnahme aktiv
+      if (isActive) {
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        
+        // Pause-Status
+        if (isPaused) {
+          pauseBtn.disabled = true;
+          resumeBtn.disabled = false;
+          recordingStatus.innerHTML = '<span class="status-icon">⏸️</span> Aufnahme pausiert';
+        } else {
+          pauseBtn.disabled = false;
+          resumeBtn.disabled = true;
+          recordingStatus.innerHTML = '<span class="recording-indicator"></span> Aufnahme läuft';
+        }
+      } 
+      // Aufnahme inaktiv
+      else {
+        startBtn.disabled = false;
+        pauseBtn.disabled = true;
+        resumeBtn.disabled = true;
+        stopBtn.disabled = true;
+        recordingStatus.innerHTML = '';
+      }
+    }
+    
+    function showMessage(message, isRecording = false) {
+      if (isRecording) {
+        uploadStatus.innerHTML = `<span class="recording-indicator"></span> ${message}`;
+      } else {
+        uploadStatus.textContent = message;
+      }
+    }
+    
+    function showError(message) {
+      uploadStatus.innerHTML = `<span class="error-message">❌ ${message}</span>`;
+      console.error(message);
+    }
+    
+    function showWarning(message) {
+      uploadStatus.innerHTML = `<span style="color: #FF9800;">⚠️ ${message}</span>`;
+      console.warn(message);
+    }
+    
+    function showSuccess(message) {
+      uploadStatus.innerHTML = `<span class="success-message">${message}</span>`;
+    }
+    
+    // --- 22) Lokale Speicherung ---
+    function saveRecording(blob, mimeType) {
+      try {
+        // In IndexedDB speichern (vereinfacht mit localStorage)
+        localStorage.setItem('lastRecordingMimeType', mimeType);
+        
+        // Blob als Base64 speichern
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onloadend = function() {
+          const base64data = reader.result;
+          localStorage.setItem('lastRecordingData', base64data);
+        };
+      } catch (err) {
+        console.warn("Konnte Aufnahme nicht lokal speichern:", err);
+      }
+    }
+    
+    // Speichert aktuelle Audiochunks (für Wiederherstellung)
+    function saveRecordingChunks() {
+      // Wir speichern hier nicht die Chunks selbst, da das zu viel wäre
+      // Stattdessen markieren wir, dass eine Aufnahme läuft
+      if (isRecording) {
+        localStorage.setItem('recordingInProgress', 'true');
+      }
+    }
+    
+    function clearSavedRecording() {
+      localStorage.removeItem('lastRecordingData');
+      localStorage.removeItem('lastRecordingMimeType');
+      localStorage.removeItem('recordingInProgress');
+    }
+    
+    function checkForSavedRecording() {
+      const savedRecording = localStorage.getItem('lastRecordingData');
+      const savedMimeType = localStorage.getItem('lastRecordingMimeType');
+      
+      if (savedRecording && savedMimeType) {
+        // Vorherige Aufnahme wiederherstellen
+        try {
+          // Base64 in Blob umwandeln
+          const byteString = atob(savedRecording.split(',')[1]);
+          const ab = new ArrayBuffer(byteString.length);
+          const ia = new Uint8Array(ab);
+          
+          for (let i = 0; i < byteString.length; i++) {
+            ia[i] = byteString.charCodeAt(i);
+          }
+          
+          currentRecordingBlob = new Blob([ab], { type: savedMimeType });
+          const audioUrl = URL.createObjectURL(currentRecordingBlob);
+          audioPlayer.src = audioUrl;
+          
+          // UI aktualisieren
+          uploadBtn.disabled = false;
+          showMessage("Gespeicherte Aufnahme geladen. Sie können sie hochladen oder eine neue erstellen.");
+        } catch (err) {
+          console.warn("Fehler beim Laden der gespeicherten Aufnahme:", err);
+          clearSavedRecording();
+        }
+      }
+      
+      // Prüfe, ob eine Aufnahme unterbrochen wurde
+      const inProgress = localStorage.getItem('recordingInProgress');
+      if (inProgress === 'true') {
+        showWarning("Eine frühere Aufnahme wurde unterbrochen. Bitte starten Sie eine neue Aufnahme.");
+        localStorage.removeItem('recordingInProgress');
+      }
+    }
+    
+    // --- 23) Hilfsfunktionen ---
+    function formatBytes(bytes, decimals = 2) {
+      if (bytes === 0) return '0 Bytes';
+      
+      const k = 1024;
+      const dm = decimals < 0 ? 0 : decimals;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+    
+    // --- 24) Initialisierung starten ---
+    init();
+  </script>
+</body>
+</html>
