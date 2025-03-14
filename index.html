@@ -2,17 +2,13 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <title>Podcast Aufnahme mit Supabase (Optimiert)</title>
-
-  <!-- FFmpeg.js (korrekte Version für createFFmpeg / fetchFile) -->
-  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.9/dist/ffmpeg.min.js"></script>
+  <title>Podcast Aufnahme – WebM mit Supabase</title>
 
   <!-- JSZip & FileSaver für „Alles herunterladen“ -->
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
 
   <style>
-    /* Allgemeines Seitenlayout */
     body {
       margin: 0;
       font-family: Arial, sans-serif;
@@ -37,10 +33,21 @@
       margin-top: 0;
       font-size: 1.5rem;
     }
+    .record-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    input[type="text"] {
+      padding: 0.4rem;
+      flex: 1;
+    }
     button {
       padding: 0.6rem 1rem;
       font-size: 1rem;
-      margin: 0.5rem 0.3rem;
+      margin: 0.3rem;
       cursor: pointer;
       border: none;
       border-radius: 4px;
@@ -51,21 +58,6 @@
     button:hover {
       background: #45a049;
     }
-    /* Aufnahme-Container */
-    .record-controls {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    label {
-      margin-right: 0.5rem;
-    }
-    input[type="text"] {
-      padding: 0.4rem;
-      flex: 1;
-    }
-    /* Audio + Status */
     audio {
       width: 100%;
       margin: 1rem 0;
@@ -74,7 +66,32 @@
       margin: 1rem 0;
       font-weight: bold;
     }
-    /* Dateilisten */
+    .visualizer-container {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      margin: 20px auto 40px auto; /* Abstand nach unten, damit nix wackelt */
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      background: #fafafa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .visualizer-circle {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      background: #f44336;
+      border-radius: 50%;
+      transition: width 0.1s, height 0.1s;
+    }
+    #timerDisplay {
+      text-align: center;
+      font-size: 1.2rem;
+      font-weight: bold;
+      margin-bottom: 1rem;
+    }
     .file-list, .admin-panel {
       margin-top: 2rem;
     }
@@ -99,7 +116,6 @@
     .file-list a:hover, .admin-panel a:hover {
       text-decoration: underline;
     }
-    /* Admin-Bereich */
     .admin-panel {
       display: none;
       border-top: 1px solid #ccc;
@@ -112,46 +128,18 @@
     .admin-panel button.delete:hover {
       background: #c9302c;
     }
-    /* Kreis für Lautstärkeanzeige */
-    .visualizer-container {
-      position: relative;
-      width: 200px;
-      height: 200px;
-      margin: 20px auto 50px auto; /* 50px Abstand nach unten */
-      border: 2px solid #ccc;
-      border-radius: 8px;
-      background: #fafafa;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .visualizer-circle {
-      position: absolute;
-      width: 40px;
-      height: 40px;
-      background: #f44336;
-      border-radius: 50%;
-      transition: width 0.1s, height 0.1s;
-    }
-    /* Timer-Anzeige */
-    #timerDisplay {
-      text-align: center;
-      font-size: 1.2rem;
-      font-weight: bold;
-    }
   </style>
 </head>
 <body>
   <header>
-    <h1>Podcast Aufnahme mit Supabase</h1>
+    <h1>Podcast Aufnahme – WebM</h1>
   </header>
 
   <div class="container">
     <!-- Aufnahme-Steuerung -->
     <div class="record-controls">
-      <label for="filename">Dateiname (optional):</label>
-      <input type="text" id="filename" placeholder="z.B. meine-aufnahme" />
-      <button id="startBtn">Aufnahme starten</button>
+      <input type="text" id="filename" placeholder="Dateiname (Pflicht!)" />
+      <button id="startBtn" disabled>Aufnahme starten</button>
       <button id="stopBtn" disabled>Stoppen</button>
       <button id="uploadBtn" disabled>Hochladen</button>
     </div>
@@ -159,11 +147,11 @@
     <!-- Timer-Anzeige -->
     <div id="timerDisplay">00:00</div>
 
-    <!-- Audio-Player & Status -->
+    <!-- Audio-Vorschau & Status -->
     <audio id="audioPlayer" controls></audio>
     <p id="uploadStatus"></p>
 
-    <!-- Visualizer -->
+    <!-- Visueller Lautstärke-Indikator -->
     <div class="visualizer-container">
       <div class="visualizer-circle" id="visualizerCircle"></div>
     </div>
@@ -186,16 +174,16 @@
     <button id="adminLoginBtn" style="background:#333;">Admin Login</button>
   </div>
 
-  <!-- Haupt-Script als ES-Modul -->
+  <!-- Supabase (ES-Modul) -->
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-    // 1) Supabase-Konfiguration
-    const SUPABASE_URL = "https://qzmzlrsfuepbkqwzbrir.supabase.co";
+    // --- 1) SUPABASE KONFIG ---
+    const SUPABASE_URL = "https://DEINE-URL.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6bXpscnNmdWVwYmtxd3picmlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE5NTkxMzAsImV4cCI6MjA1NzUzNTEzMH0.zLZDSfylloUxlxYPEpfO4VMAdf0cNpUzKH2T9qv8ezI";
     const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // 2) Variablen
+    // --- 2) Variablen ---
     let mediaRecorder;
     let audioChunks = [];
     let currentRecordingBlob = null;
@@ -203,26 +191,40 @@
     let recordingTime = 0;
     let recordingInterval = null;
 
-    // 3) DOM-Elemente
-    const startBtn        = document.getElementById("startBtn");
-    const stopBtn         = document.getElementById("stopBtn");
-    const uploadBtn       = document.getElementById("uploadBtn");
-    const audioPlayer     = document.getElementById("audioPlayer");
-    const uploadStatus    = document.getElementById("uploadStatus");
-    const fileList        = document.getElementById("fileList");
-    const adminPanel      = document.getElementById("adminPanel");
-    const adminFileList   = document.getElementById("adminFileList");
-    const adminLoginBtn   = document.getElementById("adminLoginBtn");
-    const closeAdminBtn   = document.getElementById("closeAdminBtn");
-    const visualizerCircle= document.getElementById("visualizerCircle");
-    const downloadAllBtn  = document.getElementById("downloadAllBtn");
-    const timerDisplay    = document.getElementById("timerDisplay");
+    // --- 3) DOM-Elemente ---
+    const filenameInput    = document.getElementById("filename");
+    const startBtn         = document.getElementById("startBtn");
+    const stopBtn          = document.getElementById("stopBtn");
+    const uploadBtn        = document.getElementById("uploadBtn");
+    const audioPlayer      = document.getElementById("audioPlayer");
+    const uploadStatus     = document.getElementById("uploadStatus");
+    const fileList         = document.getElementById("fileList");
+    const adminPanel       = document.getElementById("adminPanel");
+    const adminFileList    = document.getElementById("adminFileList");
+    const adminLoginBtn    = document.getElementById("adminLoginBtn");
+    const closeAdminBtn    = document.getElementById("closeAdminBtn");
+    const visualizerCircle = document.getElementById("visualizerCircle");
+    const downloadAllBtn   = document.getElementById("downloadAllBtn");
+    const timerDisplay     = document.getElementById("timerDisplay");
 
-    // 4) Aufnahme starten
+    // --- 4) Dateiname-Pflicht: Start-Button nur aktiv, wenn Input nicht leer ---
+    filenameInput.addEventListener("input", () => {
+      if (filenameInput.value.trim()) {
+        startBtn.disabled = false;
+      } else {
+        startBtn.disabled = true;
+      }
+    });
+
+    // --- 5) Aufnahme starten ---
     startBtn.addEventListener("click", async () => {
+      if (!filenameInput.value.trim()) {
+        alert("Bitte erst einen Dateinamen eingeben!");
+        return;
+      }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
         audioChunks = [];
         mediaRecorder.start();
 
@@ -231,7 +233,6 @@
             audioChunks.push(event.data);
           }
         };
-
         mediaRecorder.onstop = () => {
           currentRecordingBlob = new Blob(audioChunks, { type: 'audio/webm' });
           const webmUrl = URL.createObjectURL(currentRecordingBlob);
@@ -242,6 +243,7 @@
           stopTimer();
         };
 
+        // Visualizer + Timer starten
         startVisualizer(stream);
         startTimer();
 
@@ -254,7 +256,7 @@
       }
     });
 
-    // 5) Aufnahme stoppen
+    // --- 6) Aufnahme stoppen ---
     stopBtn.addEventListener("click", () => {
       if (mediaRecorder) {
         mediaRecorder.stop();
@@ -263,51 +265,37 @@
       }
     });
 
-    // 6) Upload-Button
+    // --- 7) Upload (WebM) ---
     uploadBtn.addEventListener("click", async () => {
       if (!currentRecordingBlob) {
         uploadStatus.textContent = "Keine Aufnahme vorhanden!";
         return;
       }
-      uploadStatus.textContent = "Aufnahme wird konvertiert und hochgeladen...";
-      uploadBtn.disabled = true; 
-      await convertAndUpload(currentRecordingBlob);
-      currentRecordingBlob = null;
-    });
+      uploadStatus.textContent = "Wird hochgeladen...";
+      uploadBtn.disabled = true;
 
-    // 7) Konvertierung & Upload
-    async function convertAndUpload(webmBlob) {
-      const { createFFmpeg, fetchFile } = FFmpeg;
-      const ffmpeg = createFFmpeg({ log: false });
-      await ffmpeg.load();
-      ffmpeg.FS('writeFile', 'aufnahme.webm', await fetchFile(webmBlob));
-      await ffmpeg.run('-i', 'aufnahme.webm', 'aufnahme.mp3');
-      const mp3Data = ffmpeg.FS('readFile', 'aufnahme.mp3');
-      const mp3Blob = new Blob([mp3Data.buffer], { type: 'audio/mp3' });
+      let baseName = filenameInput.value.trim();
+      const fileName = baseName + ".webm";
 
-      // Dateiname oder Fallback
-      let baseName = document.getElementById("filename").value.trim();
-      if (!baseName) {
-        baseName = "aufnahme_" + Date.now();
-      }
-      const fileName = baseName + ".mp3";
-
-      // Upload zu Supabase
+      // WebM hochladen
       const { error } = await supabaseClient
         .storage
         .from('podcast-audio')
-        .upload(fileName, mp3Blob, { contentType: 'audio/mp3' });
+        .upload(fileName, currentRecordingBlob, { contentType: 'audio/webm' });
 
       if (error) {
         console.error("Upload-Fehler:", error);
         uploadStatus.textContent = "❌ Fehler beim Upload";
         return;
       }
-      uploadStatus.textContent = "✅ Erfolgreich hochgeladen als: " + fileName;
-      loadFiles(); 
-    }
+      uploadStatus.textContent = "✅ Erfolgreich hochgeladen: " + fileName;
 
-    // 8) Öffentliche Dateiliste laden
+      currentRecordingBlob = null;
+      // Dateiliste aktualisieren
+      loadFiles();
+    });
+
+    // --- 8) Öffentliche Dateiliste laden ---
     async function loadFiles() {
       fileList.innerHTML = "";
       const { data, error } = await supabaseClient.storage
@@ -318,20 +306,21 @@
         console.error("Fehler beim Laden der Dateien:", error);
         return;
       }
-
       if (!data) return;
+
       for (const file of data) {
         const { data: publicUrl } = supabaseClient
           .storage
           .from('podcast-audio')
           .getPublicUrl(file.name);
+
         const li = document.createElement('li');
         li.innerHTML = `<a href="${publicUrl.publicUrl}" target="_blank">${file.name}</a>`;
         fileList.appendChild(li);
       }
     }
 
-    // 9) Admin-Bereich
+    // --- 9) Admin-Bereich ---
     adminLoginBtn.addEventListener("click", () => {
       const pwd = prompt("Bitte Admin-Passwort eingeben:");
       if (pwd === "Luna") {
@@ -341,7 +330,6 @@
         alert("Falsches Passwort!");
       }
     });
-
     closeAdminBtn.addEventListener("click", () => {
       adminPanel.style.display = "none";
     });
@@ -364,7 +352,6 @@
           .storage
           .from('podcast-audio')
           .getPublicUrl(file.name);
-
         const li = document.createElement('li');
         li.innerHTML = `
           <a href="${publicUrl.publicUrl}" target="_blank">${file.name}</a>
@@ -392,7 +379,7 @@
       }
     });
 
-    // Alles herunterladen
+    // Alles herunterladen (ZIP)
     downloadAllBtn.addEventListener("click", async () => {
       try {
         const { data, error } = await supabaseClient.storage
@@ -408,7 +395,7 @@
         const zip = new JSZip();
         for (const file of data) {
           const fileName = file.name;
-          const { data: publicUrlData } = supabaseClient.storage
+          const { data: publicUrlData } = supabaseClient
             .from('podcast-audio')
             .getPublicUrl(fileName);
           const fileUrl = publicUrlData.publicUrl;
@@ -423,7 +410,7 @@
       }
     });
 
-    // 10) Lautstärke-Visualizer
+    // --- 10) Visualizer ---
     function startVisualizer(stream) {
       audioContext = new AudioContext();
       const source = audioContext.createMediaStreamSource(stream);
@@ -436,15 +423,13 @@
     function animateVisualizer() {
       animationId = requestAnimationFrame(animateVisualizer);
       analyser.getByteTimeDomainData(dataArray);
-
-      // RMS (Lautstärke)
       let sum = 0;
       for (let i = 0; i < dataArray.length; i++) {
         const val = dataArray[i] - 128;
         sum += val * val;
       }
       const rms = Math.sqrt(sum / dataArray.length);
-      const size = 40 + rms; 
+      const size = 40 + rms;
       visualizerCircle.style.width = size + "px";
       visualizerCircle.style.height = size + "px";
     }
@@ -457,12 +442,11 @@
         audioContext.close();
         audioContext = null;
       }
-      // Kreis zurücksetzen
       visualizerCircle.style.width = "40px";
       visualizerCircle.style.height = "40px";
     }
 
-    // 11) Timer für Aufnahme
+    // --- 11) Timer ---
     function startTimer() {
       recordingTime = 0;
       updateTimerDisplay(0);
@@ -485,7 +469,7 @@
       timerDisplay.textContent = mm + ":" + ss;
     }
 
-    // 12) Seite laden => Dateiliste
+    // --- 12) Seite laden => Dateiliste abrufen ---
     loadFiles();
   </script>
 </body>
