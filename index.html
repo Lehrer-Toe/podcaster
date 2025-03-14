@@ -77,6 +77,22 @@
       }
     }
     
+    .button-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      grid-column: 1 / -1;
+    }
+    
+    .button-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .button-row button {
+      flex: 1;
+    }
+    
     .filename-input-container {
       position: relative;
       grid-column: 1 / -1;
@@ -155,20 +171,12 @@
       background: #3e9142;
     }
     
-    #pauseBtn {
+    #pauseBtn, #resumeBtn {
       background: #FF9800;
     }
     
-    #pauseBtn:hover:not(:disabled) {
+    #pauseBtn:hover:not(:disabled), #resumeBtn:hover:not(:disabled) {
       background: #F57C00;
-    }
-    
-    #resumeBtn {
-      background: #2196F3;
-    }
-    
-    #resumeBtn:hover:not(:disabled) {
-      background: #1976D2;
     }
     
     #stopBtn {
@@ -429,6 +437,25 @@
       font-weight: 500;
     }
     
+    /* Mikrofon-Zugriffswarnung */
+    .microphone-warning {
+      display: none;
+      background-color: #fffde7;
+      border: 1px solid #ffd600;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    
+    .microphone-warning h3 {
+      margin-top: 0;
+      color: #f57f17;
+    }
+    
+    .microphone-warning ul {
+      margin-bottom: 0;
+    }
+    
     /* Verbesserte iPad-spezifische Styles */
     @media (max-width: 1024px) and (-webkit-min-device-pixel-ratio: 2), 
            (max-width: 1024px) and (min-resolution: 192dpi) {
@@ -454,17 +481,21 @@
   </header>
 
   <div class="container">
+    <!-- Mikrofon-Zugriffswarnung für iOS -->
+    <div class="microphone-warning" id="microphoneWarning">
+      <h3>⚠️ Mikrofon-Zugriff erforderlich</h3>
+      <p>Ihr Gerät erlaubt den Zugriff auf das Mikrofon nicht. So können Sie den Zugriff aktivieren:</p>
+      <ul>
+        <li>Stellen Sie sicher, dass Sie "Erlauben" drücken, wenn nach Mikrofonzugriff gefragt wird</li>
+        <li>Überprüfen Sie die Einstellungen Ihres Browsers oder Geräts, um den Mikrofonzugriff zu aktivieren</li>
+        <li>Auf iOS: Öffnen Sie die Einstellungen > Safari > Seitenberechtigung > Mikrofon und aktivieren Sie den Zugriff</li>
+      </ul>
+    </div>
+
     <!-- Aufnahme-Steuerung -->
-    <div class="record-controls">
-      <div class="filename-input-container">
-        <label for="filename" class="input-label">Dateiname (Pflicht)</label>
-        <input type="text" id="filename" placeholder="Bitte Dateinamen eingeben" />
-      </div>
-      <button id="startBtn">Aufnahme starten</button>
-      <button id="pauseBtn" disabled>Pausieren</button>
-      <button id="resumeBtn" disabled>Fortsetzen</button>
-      <button id="stopBtn" disabled>Stoppen</button>
-      <button id="uploadBtn" disabled>Hochladen</button>
+    <div class="filename-input-container">
+      <label for="filename" class="input-label">Dateiname (Pflicht)</label>
+      <input type="text" id="filename" placeholder="Bitte Dateinamen eingeben" />
     </div>
 
     <!-- Audio-Format Auswahl -->
@@ -475,6 +506,18 @@
         <option value="audio/ogg;codecs=opus">Ogg Opus</option>
         <option value="audio/mpeg">MP3 (falls unterstützt)</option>
       </select>
+    </div>
+
+    <div class="button-group">
+      <div class="button-row">
+        <button id="startBtn">Aufnahme starten</button>
+        <button id="stopBtn" disabled>Stoppen</button>
+      </div>
+      <div class="button-row">
+        <button id="pauseBtn" disabled>Pausieren</button>
+        <button id="resumeBtn" disabled>Fortsetzen</button>
+      </div>
+      <button id="uploadBtn" disabled>Hochladen</button>
     </div>
 
     <!-- Status-Anzeige -->
@@ -522,6 +565,13 @@
           <li>Klicken Sie auf "Hochladen", um die Aufnahme zu speichern</li>
         </ol>
         <p><strong>Hinweis:</strong> Ihr Browser speichert die letzte Aufnahme lokal. Sie können die Seite neu laden, ohne die Aufnahme zu verlieren.</p>
+        
+        <h3>Fehlerbehebung</h3>
+        <ul>
+          <li><strong>Mikrofon funktioniert nicht:</strong> Prüfen Sie die Browsereinstellungen und erteilen Sie die Berechtigung für den Mikrofonzugriff.</li>
+          <li><strong>Aufnahme startet nicht:</strong> Stellen Sie sicher, dass ein Dateiname eingegeben wurde.</li>
+          <li><strong>Hochladen funktioniert nicht:</strong> Möglicherweise ist die Verbindung zum Server unterbrochen. Versuchen Sie es später erneut.</li>
+        </ul>
       </div>
     </div>
 
@@ -542,9 +592,8 @@
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
     // --- 1) SUPABASE KONFIG --- 
-    // Diese Werte sollten idealerweise über eine Server-Umgebungsvariable kommen
-    // Hier nur für Demo-Zwecke im Client - für Produktion nicht empfohlen
-    const SUPABASE_URL = "https://DEINE-URL.supabase.co";
+    // Diese Werte müssen korrekt gesetzt werden
+    const SUPABASE_URL = "https://qzmzlrsfuepbkqwzbrir.supabase.co"; // KORRIGIERT: Echte URL statt Platzhalter
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6bXpscnNmdWVwYmtxd3picmlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE5NTkxMzAsImV4cCI6MjA1NzUzNTEzMH0.zLZDSfylloUxlxYPEpfO4VMAdf0cNpUzKH2T9qv8ezI";
     
     // Initialisiere Supabase Client
@@ -572,7 +621,8 @@
     const appSettings = {
       adminLoggedIn: false,
       lastFormat: localStorage.getItem('preferredFormat') || 'audio/webm',
-      lastFileName: localStorage.getItem('lastFileName') || ''
+      lastFileName: localStorage.getItem('lastFileName') || '',
+      isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent)
     };
 
     // --- 3) DOM-Elemente ---
@@ -596,14 +646,17 @@
     const audioFormat      = document.getElementById("audioFormat");
     const tabButtons       = document.querySelectorAll(".tab-button");
     const tabContents      = document.querySelectorAll(".tab-content");
+    const microphoneWarning = document.getElementById("microphoneWarning");
 
     // --- 4) Initialisierung ---
     function init() {
       // Lade gespeicherte Einstellungen aus dem LocalStorage
       if (appSettings.lastFileName) {
         filenameInput.value = appSettings.lastFileName;
-        validateFileName(); // Wichtig: Hier wurde ein Bug behoben!
       }
+      
+      // Immer validateFileName ausführen, um den Button-Status zu aktualisieren
+      validateFileName();
       
       if (appSettings.lastFormat) {
         audioFormat.value = appSettings.lastFormat;
@@ -612,14 +665,23 @@
       // Prüfe Browser-Unterstützung
       checkBrowserSupport();
       
-      // Lade vorhandene Dateien
-      loadFiles();
+      // Warnungen für iOS-Geräte
+      if (appSettings.isIOS) {
+        console.log("iOS-Gerät erkannt, spezielle Konfiguration wird angewendet");
+        // Auf iOS werden zusätzliche Berechtigungen benötigt
+        microphoneWarning.style.display = "block";
+      }
+      
+      // Lade vorhandene Dateien mit Fehlerbehandlung
+      loadFilesWithRetry();
       
       // Setze Event Listeners
       setupEventListeners();
       
       // Prüfe, ob es eine gespeicherte Aufnahme gibt
       checkForSavedRecording();
+      
+      console.log("Anwendung initialisiert. iOS:", appSettings.isIOS);
     }
 
     // --- 5) Browser-Unterstützung prüfen ---
@@ -673,6 +735,11 @@
 
       // Dateiliste Löschen (nur für Admin)
       adminFileList.addEventListener("click", handleAdminFileAction);
+      
+      // Für iOS Touch-Events aktivieren
+      if (appSettings.isIOS) {
+        document.addEventListener('touchstart', function(){}, {passive: true});
+      }
     }
 
     // --- 7) Dateiname-Validierung ---
@@ -686,7 +753,7 @@
         startBtn.disabled = true;
       }
 
-      // Debug-Information zur Hilfe
+      // Debug-Information
       console.log("Dateiname validiert:", filename, "Start-Button aktiviert:", !startBtn.disabled);
     }
 
@@ -702,8 +769,38 @@
       if (!checkBrowserSupport()) return;
       
       try {
-        // Audiostream anfordern
-        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Mikrofon-Warnung ausblenden
+        microphoneWarning.style.display = "none";
+        
+        // Spezielle Constraints für iOS
+        const constraints = {
+          audio: true
+        };
+        
+        if (appSettings.isIOS) {
+          // iOS benötigt manchmal explizite Einstellungen
+          constraints.audio = {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false
+          };
+        }
+        
+        // Audiostream anfordern mit besserer Fehlerbehandlung
+        try {
+          audioStream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (micError) {
+          console.error("Mikrofon-Zugriffsfehler:", micError);
+          
+          if (micError.name === 'NotAllowedError' || micError.name === 'PermissionDeniedError') {
+            microphoneWarning.style.display = "block";
+            throw new Error("Mikrofon-Zugriff verweigert. Bitte erteilen Sie die Berechtigung in Ihren Browsereinstellungen.");
+          } else if (micError.name === 'NotFoundError') {
+            throw new Error("Kein Mikrofon gefunden. Bitte prüfen Sie, ob ein Mikrofon angeschlossen ist.");
+          } else {
+            throw micError;
+          }
+        }
         
         // Prüfe, ob das gewählte Format unterstützt wird
         const selectedFormat = audioFormat.value;
@@ -743,8 +840,11 @@
         
         showMessage("Aufnahme läuft...", true);
       } catch (err) {
-        showError("Mikrofon-Zugriff nicht erlaubt oder nicht verfügbar.");
+        showError(err.message || "Aufnahmefehler. Bitte versuchen Sie es erneut.");
         console.error("Aufnahmefehler:", err);
+        
+        // Mikrofon-Warnung anzeigen
+        microphoneWarning.style.display = "block";
       }
     }
     
@@ -775,17 +875,22 @@
     // --- 11) Aufnahme stoppen ---
     function stopRecording() {
       if (mediaRecorder && (mediaRecorder.state === "recording" || mediaRecorder.state === "paused")) {
-        mediaRecorder.stop();
-        isRecording = false;
-        isPaused = false;
-        
-        if (audioStream) {
-          audioStream.getTracks().forEach(track => track.stop());
+        try {
+          mediaRecorder.stop();
+          isRecording = false;
+          isPaused = false;
+          
+          if (audioStream) {
+            audioStream.getTracks().forEach(track => track.stop());
+          }
+          
+          stopTimer();
+          stopVisualizer();
+          updateRecordingUI(false);
+        } catch (error) {
+          console.error("Fehler beim Stoppen der Aufnahme:", error);
+          showError("Fehler beim Stoppen der Aufnahme. Bitte laden Sie die Seite neu.");
         }
-        
-        stopTimer();
-        stopVisualizer();
-        updateRecordingUI(false);
       }
     }
 
@@ -799,20 +904,27 @@
     }
     
     function handleRecordingStop() {
-      // Erstelle Blob aus gesammelten Daten
-      const mimeType = audioFormat.value;
-      currentRecordingBlob = new Blob(audioChunks, { type: mimeType });
-      
-      // Audio-Player aktualisieren
-      const audioUrl = URL.createObjectURL(currentRecordingBlob);
-      audioPlayer.src = audioUrl;
-      
-      // UI aktualisieren
-      uploadBtn.disabled = false;
-      showMessage("Aufnahme bereit – bitte jetzt anhören und hochladen.", false);
-      
-      // Lokale Kopie speichern
-      saveRecording(currentRecordingBlob, mimeType);
+      try {
+        // Erstelle Blob aus gesammelten Daten
+        const mimeType = audioFormat.value;
+        currentRecordingBlob = new Blob(audioChunks, { type: mimeType });
+        
+        // Audio-Player aktualisieren
+        const audioUrl = URL.createObjectURL(currentRecordingBlob);
+        audioPlayer.src = audioUrl;
+        
+        // UI aktualisieren
+        uploadBtn.disabled = false;
+        showMessage("Aufnahme bereit – bitte jetzt anhören und hochladen.", false);
+        
+        // Lokale Kopie speichern
+        saveRecording(currentRecordingBlob, mimeType);
+        
+        console.log("Aufnahme erfolgreich gestoppt. Größe:", formatBytes(currentRecordingBlob.size));
+      } catch (error) {
+        console.error("Fehler beim Verarbeiten der Aufnahme:", error);
+        showError("Fehler beim Verarbeiten der Aufnahme: " + error.message);
+      }
     }
     
     function handleRecordingPause() {
@@ -857,15 +969,37 @@
       const fileName = baseName + extension;
       
       try {
-        // Auf Supabase hochladen
-        const { error } = await supabaseClient
-          .storage
-          .from('podcast-audio')
-          .upload(fileName, currentRecordingBlob, { contentType: mimeType });
+        console.log("Upload starten: Datei", fileName, "Größe:", formatBytes(currentRecordingBlob.size));
         
-        if (error) {
-          throw error;
-        }
+        // Auf Supabase hochladen mit Wiederholungslogik
+        const uploadWithRetry = async (retries = 3) => {
+          try {
+            const { error } = await supabaseClient
+              .storage
+              .from('podcast-audio')
+              .upload(fileName, currentRecordingBlob, { 
+                contentType: mimeType,
+                cacheControl: '3600'
+              });
+            
+            if (error) {
+              throw error;
+            }
+            
+            return { success: true };
+          } catch (error) {
+            console.warn(`Upload-Versuch fehlgeschlagen (${retries} verbleibend):`, error);
+            
+            if (retries > 0) {
+              await new Promise(resolve => setTimeout(resolve, 1000)); // 1s warten
+              return uploadWithRetry(retries - 1);
+            }
+            
+            throw error;
+          }
+        };
+        
+        await uploadWithRetry();
         
         // Erfolgsmeldung
         showSuccess("✅ Erfolgreich hochgeladen: " + fileName);
@@ -875,19 +1009,26 @@
         clearSavedRecording();
         
         // Dateiliste aktualisieren
-        loadFiles();
+        loadFilesWithRetry();
       } catch (error) {
         console.error("Upload-Fehler:", error);
-        showError("❌ Fehler beim Upload: " + error.message);
+        showError("❌ Fehler beim Upload: " + (error.message || "Verbindungsproblem"));
         uploadBtn.disabled = false;
       }
     }
 
-    // --- 14) Öffentliche Dateiliste laden ---
-    async function loadFiles() {
+    // --- 14) Öffentliche Dateiliste laden mit Wiederholungen ---
+    async function loadFilesWithRetry(retries = 3) {
+      if (retries <= 0) {
+        fileList.innerHTML = "<li class='error-message'>Fehler beim Laden der Dateien nach mehreren Versuchen</li>";
+        return;
+      }
+      
       fileList.innerHTML = "<li>Dateien werden geladen...</li>";
       
       try {
+        console.log("Dateien werden geladen, Versuch", 4-retries);
+        
         const { data, error } = await supabaseClient.storage
           .from('podcast-audio')
           .list('', { limit: 100, offset: 0, sortBy: { column: 'created_at', order: 'desc' } });
@@ -920,7 +1061,11 @@
         }
       } catch (err) {
         console.error("Fehler beim Laden der Dateien:", err);
-        fileList.innerHTML = "<li class='error-message'>Fehler beim Laden der Dateien</li>";
+        
+        // Wiederhole nach kurzer Verzögerung
+        setTimeout(() => {
+          loadFilesWithRetry(retries - 1);
+        }, 1500);
       }
     }
 
@@ -956,7 +1101,7 @@
     function showAdminPanel() {
       adminPanel.style.display = "block";
       appSettings.adminLoggedIn = true;
-      loadAdminFiles();
+      loadAdminFilesWithRetry();
     }
     
     // Einfache Hash-Funktion (nur für Demo, nicht sicher!)
@@ -970,10 +1115,17 @@
     }
 
     // --- 16) Admin-Dateien laden ---
-    async function loadAdminFiles() {
+    async function loadAdminFilesWithRetry(retries = 3) {
+      if (retries <= 0) {
+        adminFileList.innerHTML = "<li class='error-message'>Fehler beim Laden der Dateien nach mehreren Versuchen</li>";
+        return;
+      }
+      
       adminFileList.innerHTML = "<li>Dateien werden geladen...</li>";
       
       try {
+        console.log("Admin-Dateien werden geladen, Versuch", 4-retries);
+        
         const { data, error } = await supabaseClient.storage
           .from('podcast-audio')
           .list('', { limit: 100, offset: 0, sortBy: { column: 'created_at', order: 'desc' } });
@@ -1005,7 +1157,11 @@
         }
       } catch (err) {
         console.error("Fehler beim Laden der Admin-Dateien:", err);
-        adminFileList.innerHTML = "<li class='error-message'>Fehler beim Laden der Dateien</li>";
+        
+        // Wiederhole nach kurzer Verzögerung
+        setTimeout(() => {
+          loadAdminFilesWithRetry(retries - 1);
+        }, 1500);
       }
     }
 
@@ -1030,8 +1186,8 @@
         }
         
         showSuccess(`Datei '${fileName}' wurde gelöscht.`);
-        loadFiles();
-        loadAdminFiles();
+        loadFilesWithRetry();
+        loadAdminFilesWithRetry();
       } catch (err) {
         showError("Fehler beim Löschen: " + err.message);
       }
@@ -1059,6 +1215,7 @@
         // ZIP-Datei erstellen
         const zip = new JSZip();
         let completedDownloads = 0;
+        let failedDownloads = 0;
         
         // Fortschritt anzeigen
         showMessage(`Lade 0/${data.length} Dateien...`, false);
@@ -1074,7 +1231,21 @@
           const fileUrl = publicUrlData.publicUrl;
           
           try {
-            const response = await fetch(fileUrl);
+            // Mit Wiederholungsversuchen
+            let response = null;
+            let attempts = 0;
+            
+            while (!response && attempts < 3) {
+              try {
+                response = await fetch(fileUrl);
+                if (!response.ok) throw new Error(`HTTP Fehler: ${response.status}`);
+              } catch (fetchError) {
+                attempts++;
+                if (attempts >= 3) throw fetchError;
+                await new Promise(resolve => setTimeout(resolve, 1000)); // 1s warten
+              }
+            }
+            
             const blob = await response.blob();
             zip.file(fileName, blob);
             
@@ -1082,6 +1253,7 @@
             showMessage(`Lade ${completedDownloads}/${data.length} Dateien...`, false);
           } catch (fetchError) {
             console.error(`Fehler beim Laden von ${fileName}:`, fetchError);
+            failedDownloads++;
             // Fehler für einzelne Dateien ignorieren, aber loggen
           }
         }
@@ -1095,7 +1267,12 @@
         const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         
         saveAs(content, `podcast-aufnahmen-${dateStr}.zip`);
-        showSuccess("ZIP-Datei wurde erstellt und heruntergeladen.");
+        
+        if (failedDownloads > 0) {
+          showWarning(`ZIP-Datei erstellt mit ${completedDownloads} Dateien. ${failedDownloads} Dateien konnten nicht geladen werden.`);
+        } else {
+          showSuccess("ZIP-Datei wurde erstellt und heruntergeladen.");
+        }
       } catch (err) {
         showError("Fehler beim ZIP-Erstellen: " + err.message);
       }
@@ -1103,37 +1280,47 @@
 
     // --- 19) Visualizer Funktionen ---
     function startVisualizer(stream) {
-      // AudioContext erstellen
-      audioContext = new AudioContext();
-      const source = audioContext.createMediaStreamSource(stream);
-      analyser = audioContext.createAnalyser();
-      analyser.fftSize = 1024;
-      source.connect(analyser);
-      dataArray = new Uint8Array(analyser.frequencyBinCount);
-      
-      // Visualizer starten
-      animateVisualizer();
+      try {
+        // AudioContext erstellen
+        audioContext = new AudioContext();
+        const source = audioContext.createMediaStreamSource(stream);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 1024;
+        source.connect(analyser);
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        
+        // Visualizer starten
+        animateVisualizer();
+      } catch (error) {
+        console.warn("Visualizer konnte nicht initialisiert werden:", error);
+        // Wir brechen die Aufnahme nicht ab, nur weil der Visualizer nicht funktioniert
+      }
     }
     
     function animateVisualizer() {
       if (!analyser) return;
       
-      animationId = requestAnimationFrame(animateVisualizer);
-      analyser.getByteTimeDomainData(dataArray);
-      
-      // RMS (Root Mean Square) Berechnung für Lautstärke
-      let sum = 0;
-      for (let i = 0; i < dataArray.length; i++) {
-        const val = dataArray[i] - 128;
-        sum += val * val;
+      try {
+        animationId = requestAnimationFrame(animateVisualizer);
+        analyser.getByteTimeDomainData(dataArray);
+        
+        // RMS (Root Mean Square) Berechnung für Lautstärke
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          const val = dataArray[i] - 128;
+          sum += val * val;
+        }
+        
+        const rms = Math.sqrt(sum / dataArray.length);
+        const size = 40 + rms; // Basisgröße + Lautstärke
+        
+        // Kreisgröße aktualisieren
+        visualizerCircle.style.width = size + "px";
+        visualizerCircle.style.height = size + "px";
+      } catch (error) {
+        console.warn("Visualizer-Fehler:", error);
+        cancelAnimationFrame(animationId);
       }
-      
-      const rms = Math.sqrt(sum / dataArray.length);
-      const size = 40 + rms; // Basisgröße + Lautstärke
-      
-      // Kreisgröße aktualisieren
-      visualizerCircle.style.width = size + "px";
-      visualizerCircle.style.height = size + "px";
     }
     
     function pauseVisualizer() {
@@ -1156,7 +1343,11 @@
       }
       
       if (audioContext) {
-        audioContext.close();
+        try {
+          audioContext.close();
+        } catch (e) {
+          console.warn("Fehler beim Schließen des AudioContext:", e);
+        }
         audioContext = null;
       }
       
@@ -1230,6 +1421,9 @@
         stopBtn.disabled = true;
         recordingStatus.innerHTML = '';
       }
+      
+      // Immer dateiname prüfen
+      validateFileName();
     }
     
     function showMessage(message, isRecording = false) {
