@@ -2,9 +2,10 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Podcast Aufnahme – WebM mit Supabase</title>
 
-  <!-- JSZip & FileSaver für „Alles herunterladen“ -->
+  <!-- JSZip & FileSaver für „Alles herunterladen" -->
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
 
@@ -44,6 +45,9 @@
       padding: 0.4rem;
       flex: 1;
     }
+    select {
+      padding: 0.4rem;
+    }
     button {
       padding: 0.6rem 1rem;
       font-size: 1rem;
@@ -58,6 +62,10 @@
     button:hover {
       background: #45a049;
     }
+    button:disabled {
+      background: #cccccc;
+      cursor: not-allowed;
+    }
     audio {
       width: 100%;
       margin: 1rem 0;
@@ -70,7 +78,7 @@
       position: relative;
       width: 200px;
       height: 200px;
-      margin: 20px auto 40px auto; /* Abstand nach unten, damit nix wackelt */
+      margin: 20px auto 40px auto;
       border: 2px solid #ccc;
       border-radius: 8px;
       background: #fafafa;
@@ -128,11 +136,95 @@
     .admin-panel button.delete:hover {
       background: #c9302c;
     }
+    .recording-indicator {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #f44336;
+      margin-right: 8px;
+      animation: blink 1s infinite;
+    }
+    @keyframes blink {
+      0% { opacity: 1; }
+      50% { opacity: 0.3; }
+      100% { opacity: 1; }
+    }
+    .status-bar {
+      display: flex;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .status-icon {
+      margin-right: 5px;
+    }
+    .audio-format-control {
+      display: flex;
+      margin-bottom: 1rem;
+      align-items: center;
+    }
+    .audio-format-control label {
+      margin-right: 1rem;
+    }
+    .tab-container {
+      margin-top: 2rem;
+    }
+    .tab-buttons {
+      display: flex;
+      border-bottom: 1px solid #ccc;
+    }
+    .tab-button {
+      background: #e9e9e9;
+      border: none;
+      padding: 10px 20px;
+      margin-right: 5px;
+      border-radius: 5px 5px 0 0;
+      cursor: pointer;
+    }
+    .tab-button.active {
+      background: #4CAF50;
+      color: white;
+    }
+    .tab-content {
+      display: none;
+      padding: 20px 10px;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); }
+      70% { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+    }
+    #pauseBtn {
+      background: #FF9800;
+    }
+    #pauseBtn:hover {
+      background: #F57C00;
+    }
+    #resumeBtn {
+      background: #2196F3;
+    }
+    #resumeBtn:hover {
+      background: #1976D2;
+    }
+    .error-message {
+      color: #d9534f;
+      font-weight: bold;
+    }
+    .success-message {
+      color: #4CAF50;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1>Podcast Aufnahme – WebM</h1>
+    <h1>Podcast Aufnahme – Audio Recorder</h1>
   </header>
 
   <div class="container">
@@ -140,8 +232,25 @@
     <div class="record-controls">
       <input type="text" id="filename" placeholder="Dateiname (Pflicht!)" />
       <button id="startBtn" disabled>Aufnahme starten</button>
+      <button id="pauseBtn" disabled>Pausieren</button>
+      <button id="resumeBtn" disabled>Fortsetzen</button>
       <button id="stopBtn" disabled>Stoppen</button>
       <button id="uploadBtn" disabled>Hochladen</button>
+    </div>
+
+    <!-- Audio-Format Auswahl -->
+    <div class="audio-format-control">
+      <label for="audioFormat">Audio-Format:</label>
+      <select id="audioFormat">
+        <option value="audio/webm">WebM (Standard)</option>
+        <option value="audio/ogg;codecs=opus">Ogg Opus</option>
+        <option value="audio/mpeg">MP3 (falls unterstützt)</option>
+      </select>
+    </div>
+
+    <!-- Status-Anzeige -->
+    <div class="status-bar">
+      <span id="recordingStatus"></span>
     </div>
 
     <!-- Timer-Anzeige -->
@@ -156,10 +265,35 @@
       <div class="visualizer-circle" id="visualizerCircle"></div>
     </div>
 
-    <!-- Öffentliche Dateiliste -->
-    <div class="file-list">
-      <h2>Vorhandene Aufnahmen:</h2>
-      <ul id="fileList"></ul>
+    <!-- Tab-Navigation -->
+    <div class="tab-container">
+      <div class="tab-buttons">
+        <button class="tab-button active" data-tab="recordings">Aufnahmen</button>
+        <button class="tab-button" data-tab="help">Hilfe</button>
+      </div>
+      
+      <!-- Aufnahmen Tab -->
+      <div class="tab-content active" id="recordings-tab">
+        <!-- Öffentliche Dateiliste -->
+        <div class="file-list">
+          <h2>Vorhandene Aufnahmen:</h2>
+          <ul id="fileList"></ul>
+        </div>
+      </div>
+      
+      <!-- Hilfe Tab -->
+      <div class="tab-content" id="help-tab">
+        <h2>Verwendung:</h2>
+        <ol>
+          <li>Geben Sie einen Dateinamen ein</li>
+          <li>Wählen Sie das gewünschte Audioformat</li>
+          <li>Klicken Sie auf "Aufnahme starten"</li>
+          <li>Sie können die Aufnahme pausieren und fortsetzen</li>
+          <li>Nach dem Stoppen können Sie die Aufnahme anhören</li>
+          <li>Klicken Sie auf "Hochladen", um die Aufnahme zu speichern</li>
+        </ol>
+        <p><strong>Hinweis:</strong> Ihr Browser speichert die letzte Aufnahme lokal. Sie können die Seite neu laden, ohne die Aufnahme zu verlieren.</p>
+      </div>
     </div>
 
     <!-- Admin-Oberfläche -->
@@ -178,22 +312,45 @@
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-    // --- 1) SUPABASE KONFIG ---
+    // --- 1) SUPABASE KONFIG --- 
+    // Diese Werte sollten idealerweise über eine Server-Umgebungsvariable kommen
+    // Hier nur für Demo-Zwecke im Client - für Produktion nicht empfohlen
     const SUPABASE_URL = "https://DEINE-URL.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6bXpscnNmdWVwYmtxd3picmlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE5NTkxMzAsImV4cCI6MjA1NzUzNTEzMH0.zLZDSfylloUxlxYPEpfO4VMAdf0cNpUzKH2T9qv8ezI";
-    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
+    // Initialisiere Supabase Client
+    let supabaseClient;
+    try {
+      supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      console.log("Supabase Client erfolgreich initialisiert");
+    } catch (err) {
+      console.error("Fehler bei der Supabase-Initialisierung:", err);
+      showError("Verbindungsfehler: Bitte später erneut versuchen.");
+    }
 
     // --- 2) Variablen ---
     let mediaRecorder;
+    let audioStream;
     let audioChunks = [];
     let currentRecordingBlob = null;
     let audioContext, analyser, dataArray, animationId;
     let recordingTime = 0;
     let recordingInterval = null;
+    let isPaused = false;
+    let isRecording = false;
+    
+    // Für die Anwendungseinstellungen
+    const appSettings = {
+      adminLoggedIn: false,
+      lastFormat: localStorage.getItem('preferredFormat') || 'audio/webm',
+      lastFileName: localStorage.getItem('lastFileName') || ''
+    };
 
     // --- 3) DOM-Elemente ---
     const filenameInput    = document.getElementById("filename");
     const startBtn         = document.getElementById("startBtn");
+    const pauseBtn         = document.getElementById("pauseBtn");
+    const resumeBtn        = document.getElementById("resumeBtn");
     const stopBtn          = document.getElementById("stopBtn");
     const uploadBtn        = document.getElementById("uploadBtn");
     const audioPlayer      = document.getElementById("audioPlayer");
@@ -206,271 +363,448 @@
     const visualizerCircle = document.getElementById("visualizerCircle");
     const downloadAllBtn   = document.getElementById("downloadAllBtn");
     const timerDisplay     = document.getElementById("timerDisplay");
+    const recordingStatus  = document.getElementById("recordingStatus");
+    const audioFormat      = document.getElementById("audioFormat");
+    const tabButtons       = document.querySelectorAll(".tab-button");
+    const tabContents      = document.querySelectorAll(".tab-content");
 
-    // --- 4) Dateiname-Pflicht: Start-Button nur aktiv, wenn Input nicht leer ---
-    filenameInput.addEventListener("input", () => {
-      if (filenameInput.value.trim()) {
-        startBtn.disabled = false;
-      } else {
-        startBtn.disabled = true;
+    // --- 4) Initialisierung ---
+    function init() {
+      // Lade gespeicherte Einstellungen aus dem LocalStorage
+      if (appSettings.lastFileName) {
+        filenameInput.value = appSettings.lastFileName;
+        validateFileName();
       }
-    });
-
-    // --- 5) Aufnahme starten ---
-    startBtn.addEventListener("click", async () => {
-      if (!filenameInput.value.trim()) {
-        alert("Bitte erst einen Dateinamen eingeben!");
-        return;
+      
+      if (appSettings.lastFormat) {
+        audioFormat.value = appSettings.lastFormat;
       }
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
-        audioChunks = [];
-        mediaRecorder.start();
-
-        mediaRecorder.ondataavailable = event => {
-          if (event.data.size > 0) {
-            audioChunks.push(event.data);
-          }
-        };
-        mediaRecorder.onstop = () => {
-          currentRecordingBlob = new Blob(audioChunks, { type: 'audio/webm' });
-          const webmUrl = URL.createObjectURL(currentRecordingBlob);
-          audioPlayer.src = webmUrl;
-          uploadStatus.textContent = "Aufnahme bereit – bitte jetzt hochladen.";
-          uploadBtn.disabled = false;
-          stopVisualizer();
-          stopTimer();
-        };
-
-        // Visualizer + Timer starten
-        startVisualizer(stream);
-        startTimer();
-
-        startBtn.disabled = true;
-        stopBtn.disabled = false;
-        uploadStatus.textContent = "Aufnahme läuft...";
-      } catch (err) {
-        alert("Mikrofon-Zugriff nicht erlaubt oder nicht verfügbar.");
-        console.error(err);
-      }
-    });
-
-    // --- 6) Aufnahme stoppen ---
-    stopBtn.addEventListener("click", () => {
-      if (mediaRecorder) {
-        mediaRecorder.stop();
-        startBtn.disabled = false;
-        stopBtn.disabled = true;
-      }
-    });
-
-    // --- 7) Upload (WebM) ---
-    uploadBtn.addEventListener("click", async () => {
-      if (!currentRecordingBlob) {
-        uploadStatus.textContent = "Keine Aufnahme vorhanden!";
-        return;
-      }
-      uploadStatus.textContent = "Wird hochgeladen...";
-      uploadBtn.disabled = true;
-
-      let baseName = filenameInput.value.trim();
-      const fileName = baseName + ".webm";
-
-      // WebM hochladen
-      const { error } = await supabaseClient
-        .storage
-        .from('podcast-audio')
-        .upload(fileName, currentRecordingBlob, { contentType: 'audio/webm' });
-
-      if (error) {
-        console.error("Upload-Fehler:", error);
-        uploadStatus.textContent = "❌ Fehler beim Upload";
-        return;
-      }
-      uploadStatus.textContent = "✅ Erfolgreich hochgeladen: " + fileName;
-
-      currentRecordingBlob = null;
-      // Dateiliste aktualisieren
+      
+      // Prüfe Browser-Unterstützung
+      checkBrowserSupport();
+      
+      // Lade vorhandene Dateien
       loadFiles();
-    });
-
-    // --- 8) Öffentliche Dateiliste laden ---
-    async function loadFiles() {
-      fileList.innerHTML = "";
-      const { data, error } = await supabaseClient.storage
-        .from('podcast-audio')
-        .list('', { limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' } });
       
-      if (error) {
-        console.error("Fehler beim Laden der Dateien:", error);
-        return;
-      }
-      if (!data) return;
-
-      for (const file of data) {
-        const { data: publicUrl } = supabaseClient
-          .storage
-          .from('podcast-audio')
-          .getPublicUrl(file.name);
-
-        const li = document.createElement('li');
-        li.innerHTML = `<a href="${publicUrl.publicUrl}" target="_blank">${file.name}</a>`;
-        fileList.appendChild(li);
-      }
+      // Setze Event Listeners
+      setupEventListeners();
+      
+      // Prüfe, ob es eine gespeicherte Aufnahme gibt
+      checkForSavedRecording();
     }
 
-    // --- 9) Admin-Bereich ---
-    adminLoginBtn.addEventListener("click", () => {
-      const pwd = prompt("Bitte Admin-Passwort eingeben:");
-      if (pwd === "Luna") {
-        adminPanel.style.display = "block";
-        loadAdminFiles();
+    // --- 5) Browser-Unterstützung prüfen ---
+    function checkBrowserSupport() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showError("Ihr Browser unterstützt keine Audioaufnahmen. Bitte verwenden Sie einen modernen Browser wie Chrome, Firefox oder Edge.");
+        startBtn.disabled = true;
+        return false;
+      }
+      return true;
+    }
+
+    // --- 6) Event Listeners ---
+    function setupEventListeners() {
+      // Dateiname-Validierung
+      filenameInput.addEventListener("input", validateFileName);
+      
+      // Format-Änderung
+      audioFormat.addEventListener("change", () => {
+        localStorage.setItem('preferredFormat', audioFormat.value);
+      });
+      
+      // Aufnahme-Steuerung
+      startBtn.addEventListener("click", startRecording);
+      pauseBtn.addEventListener("click", pauseRecording);
+      resumeBtn.addEventListener("click", resumeRecording);
+      stopBtn.addEventListener("click", stopRecording);
+      uploadBtn.addEventListener("click", uploadRecording);
+      
+      // Admin-Bereich
+      adminLoginBtn.addEventListener("click", handleAdminLogin);
+      closeAdminBtn.addEventListener("click", () => {
+        adminPanel.style.display = "none";
+        appSettings.adminLoggedIn = false;
+      });
+      downloadAllBtn.addEventListener("click", downloadAllFiles);
+      
+      // Tab-Navigation
+      tabButtons.forEach(button => {
+        button.addEventListener("click", () => {
+          const tabId = button.dataset.tab;
+          
+          // Aktiven Tab wechseln
+          tabButtons.forEach(btn => btn.classList.remove("active"));
+          tabContents.forEach(content => content.classList.remove("active"));
+          
+          button.classList.add("active");
+          document.getElementById(`${tabId}-tab`).classList.add("active");
+        });
+      });
+
+      // Dateiliste Löschen (nur für Admin)
+      adminFileList.addEventListener("click", handleAdminFileAction);
+    }
+
+    // --- 7) Dateiname-Validierung ---
+    function validateFileName() {
+      const filename = filenameInput.value.trim();
+      
+      if (filename) {
+        startBtn.disabled = false;
+        localStorage.setItem('lastFileName', filename);
       } else {
-        alert("Falsches Passwort!");
-      }
-    });
-    closeAdminBtn.addEventListener("click", () => {
-      adminPanel.style.display = "none";
-    });
-
-    // Admin-Dateien laden
-    async function loadAdminFiles() {
-      adminFileList.innerHTML = "";
-      const { data, error } = await supabaseClient.storage
-        .from('podcast-audio')
-        .list('', { limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' } });
-      
-      if (error) {
-        console.error("Fehler beim Laden der Admin-Dateien:", error);
-        return;
-      }
-      if (!data) return;
-
-      for (const file of data) {
-        const { data: publicUrl } = supabaseClient
-          .storage
-          .from('podcast-audio')
-          .getPublicUrl(file.name);
-        const li = document.createElement('li');
-        li.innerHTML = `
-          <a href="${publicUrl.publicUrl}" target="_blank">${file.name}</a>
-          <button class="delete" data-filename="${file.name}">Löschen</button>
-        `;
-        adminFileList.appendChild(li);
+        startBtn.disabled = true;
       }
     }
 
-    // Löschen
-    adminFileList.addEventListener("click", async (e) => {
-      if (e.target.classList.contains("delete")) {
-        const fileName = e.target.getAttribute("data-filename");
+    // --- 8) Aufnahme starten ---
+    async function startRecording() {
+      const filename = filenameInput.value.trim();
+      
+      if (!filename) {
+        showError("Bitte erst einen Dateinamen eingeben!");
+        return;
+      }
+      
+      if (!checkBrowserSupport()) return;
+      
+      try {
+        // Audiostream anfordern
+        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        // Prüfe, ob das gewählte Format unterstützt wird
+        const selectedFormat = audioFormat.value;
+        const options = { mimeType: selectedFormat };
+        
+        // Prüfe, ob das Format unterstützt wird
+        if (!MediaRecorder.isTypeSupported(selectedFormat)) {
+          showWarning(`Format ${selectedFormat} wird nicht unterstützt. Fallback auf WebM.`);
+          options.mimeType = "audio/webm";
+          audioFormat.value = "audio/webm";
+        }
+        
+        // MediaRecorder initialisieren
+        mediaRecorder = new MediaRecorder(audioStream, options);
+        audioChunks = [];
+        
+        // Event Handling
+        mediaRecorder.ondataavailable = handleDataAvailable;
+        mediaRecorder.onstop = handleRecordingStop;
+        mediaRecorder.onpause = handleRecordingPause;
+        mediaRecorder.onresume = handleRecordingResume;
+        mediaRecorder.onerror = (event) => {
+          showError("Aufnahmefehler: " + event.error);
+        };
+        
+        // Aufnahme starten
+        mediaRecorder.start(1000); // Chunks alle 1 Sekunde
+        isRecording = true;
+        isPaused = false;
+        
+        // UI aktualisieren
+        updateRecordingUI(true);
+        
+        // Visualizer und Timer starten
+        startVisualizer(audioStream);
+        startTimer();
+        
+        showMessage("Aufnahme läuft...", true);
+      } catch (err) {
+        showError("Mikrofon-Zugriff nicht erlaubt oder nicht verfügbar.");
+        console.error("Aufnahmefehler:", err);
+      }
+    }
+    
+    // --- 9) Aufnahme pausieren ---
+    function pauseRecording() {
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.pause();
+        isPaused = true;
+        pauseTimer();
+        pauseVisualizer();
+        updateRecordingUI(true, true);
+        showMessage("Aufnahme pausiert", false);
+      }
+    }
+    
+    // --- 10) Aufnahme fortsetzen ---
+    function resumeRecording() {
+      if (mediaRecorder && mediaRecorder.state === "paused") {
+        mediaRecorder.resume();
+        isPaused = false;
+        resumeTimer();
+        resumeVisualizer();
+        updateRecordingUI(true, false);
+        showMessage("Aufnahme fortgesetzt", true);
+      }
+    }
+
+    // --- 11) Aufnahme stoppen ---
+    function stopRecording() {
+      if (mediaRecorder && (mediaRecorder.state === "recording" || mediaRecorder.state === "paused")) {
+        mediaRecorder.stop();
+        isRecording = false;
+        isPaused = false;
+        
+        if (audioStream) {
+          audioStream.getTracks().forEach(track => track.stop());
+        }
+        
+        stopTimer();
+        stopVisualizer();
+        updateRecordingUI(false);
+      }
+    }
+
+    // --- 12) Media Recorder Event Handler ---
+    function handleDataAvailable(event) {
+      if (event.data && event.data.size > 0) {
+        audioChunks.push(event.data);
+        // Speichere den aktuellen Stand im LocalStorage
+        saveRecordingChunks();
+      }
+    }
+    
+    function handleRecordingStop() {
+      // Erstelle Blob aus gesammelten Daten
+      const mimeType = audioFormat.value;
+      currentRecordingBlob = new Blob(audioChunks, { type: mimeType });
+      
+      // Audio-Player aktualisieren
+      const audioUrl = URL.createObjectURL(currentRecordingBlob);
+      audioPlayer.src = audioUrl;
+      
+      // UI aktualisieren
+      uploadBtn.disabled = false;
+      showMessage("Aufnahme bereit – bitte jetzt anhören und hochladen.", false);
+      
+      // Lokale Kopie speichern
+      saveRecording(currentRecordingBlob, mimeType);
+    }
+    
+    function handleRecordingPause() {
+      showMessage("Aufnahme pausiert", false);
+    }
+    
+    function handleRecordingResume() {
+      showMessage("Aufnahme fortgesetzt", true);
+    }
+
+    // --- 13) Aufnahme hochladen ---
+    async function uploadRecording() {
+      if (!currentRecordingBlob) {
+        showError("Keine Aufnahme vorhanden!");
+        return;
+      }
+      
+      showMessage("Wird hochgeladen...", false);
+      uploadBtn.disabled = true;
+      
+      // Dateinamen vorbereiten
+      let baseName = filenameInput.value.trim();
+      const mimeType = audioFormat.value;
+      let extension;
+      
+      // Dateiendung basierend auf MIME-Typ festlegen
+      switch (mimeType) {
+        case "audio/webm":
+          extension = ".webm";
+          break;
+        case "audio/ogg;codecs=opus":
+          extension = ".ogg";
+          break;
+        case "audio/mpeg":
+          extension = ".mp3";
+          break;
+        default:
+          extension = ".webm";
+      }
+      
+      // Dateinamen mit Endung erstellen
+      const fileName = baseName + extension;
+      
+      try {
+        // Auf Supabase hochladen
+        const { error } = await supabaseClient
+          .storage
+          .from('podcast-audio')
+          .upload(fileName, currentRecordingBlob, { contentType: mimeType });
+        
+        if (error) {
+          throw error;
+        }
+        
+        // Erfolgsmeldung
+        showSuccess("✅ Erfolgreich hochgeladen: " + fileName);
+        currentRecordingBlob = null;
+        
+        // Lokale Aufnahme löschen
+        clearSavedRecording();
+        
+        // Dateiliste aktualisieren
+        loadFiles();
+      } catch (error) {
+        console.error("Upload-Fehler:", error);
+        showError("❌ Fehler beim Upload: " + error.message);
+        uploadBtn.disabled = false;
+      }
+    }
+
+    // --- 14) Öffentliche Dateiliste laden ---
+    async function loadFiles() {
+      fileList.innerHTML = "<li>Dateien werden geladen...</li>";
+      
+      try {
+        const { data, error } = await supabaseClient.storage
+          .from('podcast-audio')
+          .list('', { limit: 100, offset: 0, sortBy: { column: 'created_at', order: 'desc' } });
+        
+        if (error) {
+          throw error;
+        }
+        
+        fileList.innerHTML = "";
+        
+        if (!data || data.length === 0) {
+          fileList.innerHTML = "<li>Keine Aufnahmen vorhanden</li>";
+          return;
+        }
+        
+        for (const file of data) {
+          const { data: publicUrl } = supabaseClient
+            .storage
+            .from('podcast-audio')
+            .getPublicUrl(file.name);
+          
+          const li = document.createElement('li');
+          li.innerHTML = `
+            <a href="${publicUrl.publicUrl}" target="_blank" download="${file.name}">
+              ${file.name}
+            </a>
+            <span>(${formatBytes(file.metadata?.size || 0)})</span>
+          `;
+          fileList.appendChild(li);
+        }
+      } catch (err) {
+        console.error("Fehler beim Laden der Dateien:", err);
+        fileList.innerHTML = "<li class='error-message'>Fehler beim Laden der Dateien</li>";
+      }
+    }
+
+    // --- 15) Admin-Bereich ---
+    function handleAdminLogin() {
+      // WARNUNG: In Produktion sollte das Passwort nicht im Client-Code sein
+      // Besser: Server-seitige Authentifizierung
+      const storedHash = localStorage.getItem('adminHash');
+      
+      if (storedHash) {
+        // Hash aus LocalStorage verwenden (Nutzer bereits angemeldet)
+        const pwd = prompt("Bitte Admin-Passwort eingeben:");
+        
+        if (pwd && hashPassword(pwd) === storedHash) {
+          showAdminPanel();
+        } else {
+          alert("Falsches Passwort!");
+        }
+      } else {
+        // Neues Passwort speichern (Demo-Zwecke)
+        const pwd = prompt("Bitte Admin-Passwort eingeben:");
+        
+        if (pwd === "Luna") {
+          // Passwort hashen und im LocalStorage speichern
+          localStorage.setItem('adminHash', hashPassword(pwd));
+          showAdminPanel();
+        } else {
+          alert("Falsches Passwort!");
+        }
+      }
+    }
+    
+    function showAdminPanel() {
+      adminPanel.style.display = "block";
+      appSettings.adminLoggedIn = true;
+      loadAdminFiles();
+    }
+    
+    // Einfache Hash-Funktion (nur für Demo, nicht sicher!)
+    function hashPassword(password) {
+      let hash = 0;
+      for (let i = 0; i < password.length; i++) {
+        hash = ((hash << 5) - hash) + password.charCodeAt(i);
+        hash = hash & hash; // Convert to 32bit integer
+      }
+      return hash.toString(16);
+    }
+
+    // --- 16) Admin-Dateien laden ---
+    async function loadAdminFiles() {
+      adminFileList.innerHTML = "<li>Dateien werden geladen...</li>";
+      
+      try {
+        const { data, error } = await supabaseClient.storage
+          .from('podcast-audio')
+          .list('', { limit: 100, offset: 0, sortBy: { column: 'created_at', order: 'desc' } });
+        
+        if (error) {
+          throw error;
+        }
+        
+        adminFileList.innerHTML = "";
+        
+        if (!data || data.length === 0) {
+          adminFileList.innerHTML = "<li>Keine Aufnahmen vorhanden</li>";
+          return;
+        }
+        
+        for (const file of data) {
+          const { data: publicUrl } = supabaseClient
+            .storage
+            .from('podcast-audio')
+            .getPublicUrl(file.name);
+          
+          const li = document.createElement('li');
+          li.innerHTML = `
+            <a href="${publicUrl.publicUrl}" target="_blank">${file.name}</a>
+            <span>(${formatBytes(file.metadata?.size || 0)})</span>
+            <button class="delete" data-filename="${file.name}">Löschen</button>
+          `;
+          adminFileList.appendChild(li);
+        }
+      } catch (err) {
+        console.error("Fehler beim Laden der Admin-Dateien:", err);
+        adminFileList.innerHTML = "<li class='error-message'>Fehler beim Laden der Dateien</li>";
+      }
+    }
+
+    // --- 17) Admin-Dateiaktionen ---
+    async function handleAdminFileAction(e) {
+      if (!e.target.classList.contains("delete")) return;
+      
+      const fileName = e.target.getAttribute("data-filename");
+      
+      if (!confirm(`Sind Sie sicher, dass Sie die Datei "${fileName}" löschen möchten?`)) {
+        return;
+      }
+      
+      try {
         const { error } = await supabaseClient
           .storage
           .from('podcast-audio')
           .remove([fileName]);
+          
         if (error) {
-          alert("Fehler beim Löschen: " + error.message);
-        } else {
-          alert("Datei '" + fileName + "' wurde gelöscht.");
-          loadFiles();
-          loadAdminFiles();
+          throw error;
         }
-      }
-    });
-
-    // Alles herunterladen (ZIP)
-    downloadAllBtn.addEventListener("click", async () => {
-      try {
-        const { data, error } = await supabaseClient.storage
-          .from('podcast-audio')
-          .list('', { limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' } });
         
-        if (error) {
-          alert("Fehler beim Abrufen der Dateien: " + error.message);
-          return;
-        }
-        if (!data) return;
-
-        const zip = new JSZip();
-        for (const file of data) {
-          const fileName = file.name;
-          const { data: publicUrlData } = supabaseClient
-            .from('podcast-audio')
-            .getPublicUrl(fileName);
-          const fileUrl = publicUrlData.publicUrl;
-          const response = await fetch(fileUrl);
-          const blob = await response.blob();
-          zip.file(fileName, blob);
-        }
-        const content = await zip.generateAsync({ type: "blob" });
-        saveAs(content, "podcasts.zip");
+        showSuccess(`Datei '${fileName}' wurde gelöscht.`);
+        loadFiles();
+        loadAdminFiles();
       } catch (err) {
-        alert("Fehler beim ZIP-Erstellen: " + err.message);
+        showError("Fehler beim Löschen: " + err.message);
       }
-    });
-
-    // --- 10) Visualizer ---
-    function startVisualizer(stream) {
-      audioContext = new AudioContext();
-      const source = audioContext.createMediaStreamSource(stream);
-      analyser = audioContext.createAnalyser();
-      analyser.fftSize = 1024;
-      source.connect(analyser);
-      dataArray = new Uint8Array(analyser.frequencyBinCount);
-      animateVisualizer();
-    }
-    function animateVisualizer() {
-      animationId = requestAnimationFrame(animateVisualizer);
-      analyser.getByteTimeDomainData(dataArray);
-      let sum = 0;
-      for (let i = 0; i < dataArray.length; i++) {
-        const val = dataArray[i] - 128;
-        sum += val * val;
-      }
-      const rms = Math.sqrt(sum / dataArray.length);
-      const size = 40 + rms;
-      visualizerCircle.style.width = size + "px";
-      visualizerCircle.style.height = size + "px";
-    }
-    function stopVisualizer() {
-      if (animationId) {
-        cancelAnimationFrame(animationId);
-        animationId = null;
-      }
-      if (audioContext) {
-        audioContext.close();
-        audioContext = null;
-      }
-      visualizerCircle.style.width = "40px";
-      visualizerCircle.style.height = "40px";
     }
 
-    // --- 11) Timer ---
-    function startTimer() {
-      recordingTime = 0;
-      updateTimerDisplay(0);
-      recordingInterval = setInterval(() => {
-        recordingTime++;
-        updateTimerDisplay(recordingTime);
-      }, 1000);
-    }
-    function stopTimer() {
-      if (recordingInterval) {
-        clearInterval(recordingInterval);
-        recordingInterval = null;
-      }
-    }
-    function updateTimerDisplay(seconds) {
-      let mm = Math.floor(seconds / 60);
-      let ss = seconds % 60;
-      if (mm < 10) mm = "0" + mm;
-      if (ss < 10) ss = "0" + ss;
-      timerDisplay.textContent = mm + ":" + ss;
-    }
-
-    // --- 12) Seite laden => Dateiliste abrufen ---
-    loadFiles();
-  </script>
-</body>
-</html>
+    // --- 18) Alles herunterladen (ZIP) ---
+    async function downloadAllFiles() {
+      showMessage("ZIP-Datei wird vorbereitet...", false);
