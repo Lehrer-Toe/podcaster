@@ -15,7 +15,247 @@
       font-family: Arial, sans-serif;
       background: #f4f4f4;
       color: #333;
+    // --- 19) Visualizer Funktionen ---
+    function startVisualizer(stream) {
+      // AudioContext erstellen
+      audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(stream);
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 1024;
+      source.connect(analyser);
+      dataArray = new Uint8Array(analyser.frequencyBinCount);
+      
+      // Visualizer starten
+      animateVisualizer();
     }
+    
+    function animateVisualizer() {
+      if (!analyser) return;
+      
+      animationId = requestAnimationFrame(animateVisualizer);
+      analyser.getByteTimeDomainData(dataArray);
+      
+      // RMS (Root Mean Square) Berechnung für Lautstärke
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        const val = dataArray[i] - 128;
+        sum += val * val;
+      }
+      
+      const rms = Math.sqrt(sum / dataArray.length);
+      const size = 40 + rms; // Basisgröße + Lautstärke
+      
+      // Kreisgröße aktualisieren
+      visualizerCircle.style.width = size + "px";
+      visualizerCircle.style.height = size + "px";
+    }
+    
+    function pauseVisualizer() {
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+    }
+    
+    function resumeVisualizer() {
+      if (audioContext && analyser) {
+        animateVisualizer();
+      }
+    }
+    
+    function stopVisualizer() {
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+      
+      if (audioContext) {
+        audioContext.close();
+        audioContext = null;
+      }
+      
+      // Kreisgröße zurücksetzen
+      visualizerCircle.style.width = "40px";
+      visualizerCircle.style.height = "40px";
+    }
+
+    // --- 20) Timer Funktionen ---
+    function startTimer() {
+      recordingTime = 0;
+      updateTimerDisplay(0);
+      recordingInterval = setInterval(() => {
+        recordingTime++;
+        updateTimerDisplay(recordingTime);
+      }, 1000);
+    }
+    
+    function pauseTimer() {
+      if (recordingInterval) {
+        clearInterval(recordingInterval);
+        recordingInterval = null;
+      }
+    }
+    
+    function resumeTimer() {
+      if (!recordingInterval) {
+        recordingInterval = setInterval(() => {
+          recordingTime++;
+          updateTimerDisplay(recordingTime);
+        }, 1000);
+      }
+    }
+    
+    function stopTimer() {
+      if (recordingInterval) {
+        clearInterval(recordingInterval);
+        recordingInterval = null;
+      }
+    }
+    
+    function updateTimerDisplay(seconds) {
+      const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
+      const ss = String(seconds % 60).padStart(2, "0");
+      timerDisplay.textContent = `${mm}:${ss}`;
+    }
+
+    // --- 21) UI-Hilfsfunktionen ---
+    function updateRecordingUI(isActive, isPaused = false) {
+      // Aufnahme aktiv
+      if (isActive) {
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        
+        // Pause-Status
+        if (isPaused) {
+          pauseBtn.disabled = true;
+          resumeBtn.disabled = false;
+          recordingStatus.innerHTML = '<span class="status-icon">⏸️</span> Aufnahme pausiert';
+        } else {
+          pauseBtn.disabled = false;
+          resumeBtn.disabled = true;
+          recordingStatus.innerHTML = '<span class="recording-indicator"></span> Aufnahme läuft';
+        }
+      } 
+      // Aufnahme inaktiv
+      else {
+        startBtn.disabled = false;
+        pauseBtn.disabled = true;
+        resumeBtn.disabled = true;
+        stopBtn.disabled = true;
+        recordingStatus.innerHTML = '';
+      }
+    }
+    
+    function showMessage(message, isRecording = false) {
+      if (isRecording) {
+        uploadStatus.innerHTML = `<span class="recording-indicator"></span> ${message}`;
+      } else {
+        uploadStatus.textContent = message;
+      }
+    }
+    
+    function showError(message) {
+      uploadStatus.innerHTML = `<span class="error-message">❌ ${message}</span>`;
+      console.error(message);
+    }
+    
+    function showWarning(message) {
+      uploadStatus.innerHTML = `<span style="color: #FF9800;">⚠️ ${message}</span>`;
+      console.warn(message);
+    }
+    
+    function showSuccess(message) {
+      uploadStatus.innerHTML = `<span class="success-message">${message}</span>`;
+    }
+    
+    // --- 22) Lokale Speicherung ---
+    function saveRecording(blob, mimeType) {
+      try {
+        // In IndexedDB speichern (vereinfacht mit localStorage)
+        localStorage.setItem('lastRecordingMimeType', mimeType);
+        
+        // Blob als Base64 speichern
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onloadend = function() {
+          const base64data = reader.result;
+          localStorage.setItem('lastRecordingData', base64data);
+        };
+      } catch (err) {
+        console.warn("Konnte Aufnahme nicht lokal speichern:", err);
+      }
+    }
+    
+    // Speichert aktuelle Audiochunks (für Wiederherstellung)
+    function saveRecordingChunks() {
+      // Wir speichern hier nicht die Chunks selbst, da das zu viel wäre
+      // Stattdessen markieren wir, dass eine Aufnahme läuft
+      if (isRecording) {
+        localStorage.setItem('recordingInProgress', 'true');
+      }
+    }
+    
+    function clearSavedRecording() {
+      localStorage.removeItem('lastRecordingData');
+      localStorage.removeItem('lastRecordingMimeType');
+      localStorage.removeItem('recordingInProgress');
+    }
+    
+    function checkForSavedRecording() {
+      const savedRecording = localStorage.getItem('lastRecordingData');
+      const savedMimeType = localStorage.getItem('lastRecordingMimeType');
+      
+      if (savedRecording && savedMimeType) {
+        // Vorherige Aufnahme wiederherstellen
+        try {
+          // Base64 in Blob umwandeln
+          const byteString = atob(savedRecording.split(',')[1]);
+          const ab = new ArrayBuffer(byteString.length);
+          const ia = new Uint8Array(ab);
+          
+          for (let i = 0; i < byteString.length; i++) {
+            ia[i] = byteString.charCodeAt(i);
+          }
+          
+          currentRecordingBlob = new Blob([ab], { type: savedMimeType });
+          const audioUrl = URL.createObjectURL(currentRecordingBlob);
+          audioPlayer.src = audioUrl;
+          
+          // UI aktualisieren
+          uploadBtn.disabled = false;
+          showMessage("Gespeicherte Aufnahme geladen. Sie können sie hochladen oder eine neue erstellen.");
+        } catch (err) {
+          console.warn("Fehler beim Laden der gespeicherten Aufnahme:", err);
+          clearSavedRecording();
+        }
+      }
+      
+      // Prüfe, ob eine Aufnahme unterbrochen wurde
+      const inProgress = localStorage.getItem('recordingInProgress');
+      if (inProgress === 'true') {
+        showWarning("Eine frühere Aufnahme wurde unterbrochen. Bitte starten Sie eine neue Aufnahme.");
+        localStorage.removeItem('recordingInProgress');
+      }
+    }
+    
+    // --- 23) Hilfsfunktionen ---
+    function formatBytes(bytes, decimals = 2) {
+      if (bytes === 0) return '0 Bytes';
+      
+      const k = 1024;
+      const dm = decimals < 0 ? 0 : decimals;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+    
+    // --- 24) Initialisierung starten ---
+    init();
+  </script>
+</body>
+</html>
     header {
       background: #4CAF50;
       color: #fff;
@@ -808,3 +1048,63 @@
     // --- 18) Alles herunterladen (ZIP) ---
     async function downloadAllFiles() {
       showMessage("ZIP-Datei wird vorbereitet...", false);
+      
+      try {
+        // Alle Dateien abrufen
+        const { data, error } = await supabaseClient.storage
+          .from('podcast-audio')
+          .list('', { limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' } });
+        
+        if (error) {
+          throw error;
+        }
+        
+        if (!data || data.length === 0) {
+          showWarning("Keine Dateien zum Herunterladen vorhanden.");
+          return;
+        }
+        
+        // ZIP-Datei erstellen
+        const zip = new JSZip();
+        let completedDownloads = 0;
+        
+        // Fortschritt anzeigen
+        showMessage(`Lade 0/${data.length} Dateien...`, false);
+        
+        // Alle Dateien herunterladen und zum ZIP hinzufügen
+        for (const file of data) {
+          const fileName = file.name;
+          const { data: publicUrlData } = supabaseClient
+            .storage
+            .from('podcast-audio')
+            .getPublicUrl(fileName);
+            
+          const fileUrl = publicUrlData.publicUrl;
+          
+          try {
+            const response = await fetch(fileUrl);
+            const blob = await response.blob();
+            zip.file(fileName, blob);
+            
+            completedDownloads++;
+            showMessage(`Lade ${completedDownloads}/${data.length} Dateien...`, false);
+          } catch (fetchError) {
+            console.error(`Fehler beim Laden von ${fileName}:`, fetchError);
+            // Fehler für einzelne Dateien ignorieren, aber loggen
+          }
+        }
+        
+        // ZIP erstellen und herunterladen
+        showMessage("ZIP-Datei wird erstellt...", false);
+        const content = await zip.generateAsync({ type: "blob" });
+        
+        // Aktuelles Datum für Dateinamen
+        const date = new Date();
+        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        
+        saveAs(content, `podcast-aufnahmen-${dateStr}.zip`);
+        showSuccess("ZIP-Datei wurde erstellt und heruntergeladen.");
+      } catch (err) {
+        showError("Fehler beim ZIP-Erstellen: " + err.message);
+      }
+    }
