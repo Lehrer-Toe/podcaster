@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Podcast Aufnahme – iOS kompatibel</title>
+  <title>Podcast Aufnahme</title>
 
   <!-- JSZip & FileSaver für „Alles herunterladen" -->
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -19,7 +19,7 @@
     body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background: #f8f9fa;
+      background: #fffdf0;
       color: #333;
       line-height: 1.5;
       -webkit-font-smoothing: antialiased;
@@ -27,8 +27,8 @@
     
     /* --- Header --- */
     header {
-      background: linear-gradient(135deg, #4CAF50, #2E7D32);
-      color: #fff;
+      background: linear-gradient(135deg, #fff2b2, #ffeb99);
+      color: #5a5a5a;
       padding: 1.5rem;
       text-align: center;
       box-shadow: 0 2px 15px rgba(0,0,0,0.1);
@@ -55,54 +55,33 @@
       margin-top: 0;
       font-size: 1.8rem;
       font-weight: 600;
+      color: #5a5a5a;
     }
     
     h2 {
       font-size: 1.4rem;
       margin-bottom: 1rem;
-      color: #2E7D32;
+      color: #5a5a5a;
     }
     
     /* --- Aufnahme-Controls --- */
     .record-controls {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 1rem;
-      margin-bottom: 1.5rem;
-    }
-    
-    @media (min-width: 600px) {
-      .record-controls {
-        grid-template-columns: 1fr 1fr;
-      }
-    }
-    
-    .button-group {
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
-      grid-column: 1 / -1;
-    }
-    
-    .button-row {
-      display: flex;
-      gap: 0.5rem;
-    }
-    
-    .button-row button {
-      flex: 1;
+      gap: 0.8rem;
+      margin-bottom: 1.5rem;
     }
     
     .filename-input-container {
       position: relative;
-      grid-column: 1 / -1;
+      margin-bottom: 0.5rem;
     }
     
     input[type="text"] {
       width: 100%;
       padding: 0.75rem 1rem;
       font-size: 1rem;
-      border: 2px solid #e0e0e0;
+      border: 1px solid #e0e0e0;
       border-radius: 8px;
       transition: all 0.2s ease;
       -webkit-appearance: none;
@@ -111,15 +90,15 @@
     
     input[type="text"]:focus {
       outline: none;
-      border-color: #4CAF50;
-      box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.2);
+      border-color: #ffdb4d;
+      box-shadow: 0 0 0 3px rgba(255, 219, 77, 0.3);
     }
     
     .input-label {
       display: block;
       margin-bottom: 0.5rem;
       font-weight: 500;
-      color: #444;
+      color: #5a5a5a;
     }
     
     /* --- Button Styles --- */
@@ -131,7 +110,6 @@
       border: none;
       border-radius: 8px;
       color: #fff;
-      background: #4CAF50;
       transition: all 0.2s ease;
       -webkit-appearance: none;
       appearance: none;
@@ -141,67 +119,43 @@
       min-height: 48px; /* Für bessere Touch-Ziele auf iPads */
     }
     
-    button:hover:not(:disabled) {
-      background: #45a049;
-      transform: translateY(-1px);
-      box-shadow: 0 3px 8px rgba(0,0,0,0.1);
-    }
-    
     button:active:not(:disabled) {
-      transform: translateY(0);
+      transform: translateY(1px);
     }
     
     button:disabled {
-      background: #e0e0e0;
-      color: #999;
+      opacity: 0.6;
       cursor: not-allowed;
     }
     
     button:focus {
       outline: none;
-      box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.3);
     }
     
     /* --- Spezielle Button-Typen --- */
     #startBtn {
-      background: #4CAF50;
-    }
-    
-    #startBtn:hover:not(:disabled) {
-      background: #3e9142;
-    }
-    
-    #pauseBtn, #resumeBtn {
-      background: #FF9800;
-    }
-    
-    #pauseBtn:hover:not(:disabled), #resumeBtn:hover:not(:disabled) {
-      background: #F57C00;
+      background: #5cb85c;
     }
     
     #stopBtn {
-      background: #f44336;
+      background: #d9534f;
     }
     
-    #stopBtn:hover:not(:disabled) {
-      background: #d32f2f;
+    #pauseBtn, #resumeBtn {
+      background: #ff9800;
     }
     
     #uploadBtn {
       background: #673AB7;
     }
     
-    #uploadBtn:hover:not(:disabled) {
-      background: #5E35B1;
-    }
-    
-    /* --- Audio Format Anzeige --- */
+    /* --- Audio Format Info --- */
     .format-info {
-      background-color: #f1f8e9;
+      background-color: #f0f8e6;
       border-radius: 8px;
       padding: 10px 15px;
-      margin-bottom: 1.5rem;
-      border-left: 4px solid #4CAF50;
+      margin-bottom: 1rem;
+      border-left: 4px solid #8bc34a;
     }
     
     /* --- Status-Anzeigen --- */
@@ -218,7 +172,7 @@
       font-size: 2rem;
       font-weight: 600;
       margin-bottom: 1.5rem;
-      color: #2E7D32;
+      color: #4caf50;
     }
     
     /* --- Audio Player --- */
@@ -245,13 +199,13 @@
       width: 200px;
       height: 200px;
       margin: 20px auto 40px auto;
-      border: 2px solid #e0e0e0;
       border-radius: 50%;
-      background: #fafafa;
+      background: #fff;
       display: flex;
       align-items: center;
       justify-content: center;
       box-shadow: inset 0 2px 10px rgba(0,0,0,0.05);
+      border: 1px solid #f0f0f0;
     }
     
     .visualizer-circle {
@@ -278,7 +232,7 @@
     }
     
     .tab-button {
-      background: transparent;
+      background: #f0f0f0;
       border: none;
       padding: 0.75rem 1.5rem;
       margin-right: 0.5rem;
@@ -290,7 +244,7 @@
     }
     
     .tab-button.active {
-      background: #4CAF50;
+      background: #5cb85c;
       color: white;
     }
     
@@ -311,11 +265,12 @@
     
     /* --- Dateien-Liste --- */
     .file-list, .admin-panel {
-      margin-top: 2rem;
+      margin-top: 1rem;
     }
     
     .file-list h2, .admin-panel h2 {
       margin-bottom: 1rem;
+      color: #5a5a5a;
     }
     
     .file-list ul, .admin-panel ul {
@@ -334,12 +289,8 @@
       transition: all 0.2s ease;
     }
     
-    .file-list li:hover, .admin-panel li:hover {
-      background: #f0f0f0;
-    }
-    
     .file-list a, .admin-panel a {
-      color: #4CAF50;
+      color: #5cb85c;
       text-decoration: none;
       flex: 1;
       padding: 0.25rem 0;
@@ -364,17 +315,26 @@
       font-size: 0.9rem;
     }
     
-    .admin-panel button.delete:hover {
-      background: #d32f2f;
+    .admin-panel button.toggle-visibility {
+      background: #2196F3;
+      padding: 0.5rem 0.75rem;
+      margin-left: 0.5rem;
+      font-size: 0.9rem;
+    }
+    
+    .admin-controls {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
     }
     
     #adminLoginBtn {
-      background: #333;
+      background: #424242;
       margin-top: 2rem;
     }
     
     #closeAdminBtn {
-      background: #333;
+      background: #424242;
     }
     
     /* --- Indikatoren und Animationen --- */
@@ -398,16 +358,6 @@
       margin-right: 5px;
     }
     
-    .pulse {
-      animation: pulse 2s infinite;
-    }
-    
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); }
-      70% { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
-    }
-    
     .error-message {
       color: #f44336;
       font-weight: 500;
@@ -418,35 +368,31 @@
       font-weight: 500;
     }
     
-    /* Mikrofon-Zugriffswarnung */
-    .microphone-warning {
-      display: none;
-      background-color: #fffde7;
-      border: 1px solid #ffd600;
-      border-radius: 8px;
-      padding: 1rem;
-      margin-bottom: 1rem;
+    .file-size {
+      color: #888;
+      margin-left: 0.75rem;
+      font-size: 0.9rem;
     }
     
-    .microphone-warning h3 {
-      margin-top: 0;
-      color: #f57f17;
+    .file-visibility {
+      display: flex;
+      align-items: center;
+      margin-left: 0.5rem;
     }
     
-    .microphone-warning ul {
-      margin-bottom: 0;
+    .file-visibility-icon {
+      margin-right: 0.25rem;
     }
     
-    /* iOS-spezifische Styles */
-    .ios-note {
-      background-color: #e3f2fd;
-      border-radius: 8px;
-      padding: 1rem;
-      margin: 1rem 0;
-      border-left: 4px solid #2196F3;
+    .public-file {
+      background-color: #f1f8e9;
     }
     
-    /* Verbesserte iPad-spezifische Styles */
+    .private-file {
+      background-color: #f8f9fa;
+    }
+    
+    /* iPad-spezifische Styles */
     @media (max-width: 1024px) and (-webkit-min-device-pixel-ratio: 2), 
            (max-width: 1024px) and (min-resolution: 192dpi) {
       button, input, select {
@@ -457,57 +403,35 @@
       h1 {
         font-size: 2rem;
       }
-      
-      .visualizer-container {
-        width: 180px;
-        height: 180px;
-      }
     }
   </style>
 </head>
 <body>
   <header>
-    <h1>Podcast Aufnahme – Audio Recorder</h1>
+    <h1>Podcast Aufnahme</h1>
   </header>
 
   <div class="container">
-    <!-- Mikrofon-Zugriffswarnung für iOS -->
-    <div class="microphone-warning" id="microphoneWarning">
-      <h3>⚠️ Mikrofon-Zugriff erforderlich</h3>
-      <p>Ihr Gerät erlaubt den Zugriff auf das Mikrofon nicht. So können Sie den Zugriff aktivieren:</p>
-      <ul>
-        <li>Stellen Sie sicher, dass Sie "Erlauben" drücken, wenn nach Mikrofonzugriff gefragt wird</li>
-        <li>Überprüfen Sie die Einstellungen Ihres Browsers oder Geräts, um den Mikrofonzugriff zu aktivieren</li>
-        <li>Auf iOS: Öffnen Sie die Einstellungen > Safari > Seitenberechtigung > Mikrofon und aktivieren Sie den Zugriff</li>
-      </ul>
-    </div>
-
-    <!-- iOS-spezifischer Hinweis -->
-    <div class="ios-note" id="iosNote">
-      <h3>📱 Hinweis für iOS-Nutzer</h3>
-      <p>Diese App verwendet automatisch ein mit Ihrem Gerät kompatibles Audioformat. Es ist möglich, dass die Aufnahmequalität auf iOS-Geräten etwas geringer ist als auf Desktop-Browsern.</p>
-    </div>
-
     <!-- Aufnahme-Steuerung -->
-    <div class="filename-input-container">
-      <label for="filename" class="input-label">Dateiname (Pflicht)</label>
-      <input type="text" id="filename" placeholder="Bitte Dateinamen eingeben" />
-    </div>
-
-    <!-- Audio-Format Info (kein Dropdown mehr für iOS) -->
-    <div class="format-info" id="formatInfo">
-      Aktuelles Format: <span id="currentFormat">Wird ermittelt...</span>
-    </div>
-
-    <div class="button-group">
-      <div class="button-row">
-        <button id="startBtn">Aufnahme starten</button>
-        <button id="stopBtn" disabled>Stoppen</button>
+    <div class="record-controls">
+      <div class="filename-input-container">
+        <label for="filename" class="input-label">Dateiname (Pflicht)</label>
+        <input type="text" id="filename" placeholder="Bitte Dateinamen eingeben" />
       </div>
-      <div class="button-row">
-        <button id="pauseBtn" disabled>Pausieren</button>
-        <button id="resumeBtn" disabled>Fortsetzen</button>
+
+      <!-- Audio-Format Info -->
+      <div class="format-info" id="formatInfo">
+        Aktuelles Format: <span id="currentFormat">Wird ermittelt...</span>
       </div>
+
+      <button id="startBtn">Aufnahme starten</button>
+      <button id="stopBtn" disabled>Stoppen</button>
+      
+      <div style="display:flex; gap: 0.8rem;">
+        <button id="pauseBtn" disabled style="flex: 1;">Pausieren</button>
+        <button id="resumeBtn" disabled style="flex: 1;">Fortsetzen</button>
+      </div>
+      
       <button id="uploadBtn" disabled>Hochladen</button>
     </div>
 
@@ -519,14 +443,14 @@
     <!-- Timer-Anzeige -->
     <div id="timerDisplay">00:00</div>
 
-    <!-- Audio-Vorschau & Status -->
-    <audio id="audioPlayer" controls></audio>
-    <p id="uploadStatus"></p>
-
     <!-- Visueller Lautstärke-Indikator -->
     <div class="visualizer-container">
       <div class="visualizer-circle" id="visualizerCircle"></div>
     </div>
+
+    <!-- Audio-Vorschau & Status -->
+    <audio id="audioPlayer" controls></audio>
+    <p id="uploadStatus"></p>
 
     <!-- Tab-Navigation -->
     <div class="tab-container">
@@ -569,7 +493,14 @@
     <!-- Admin-Oberfläche -->
     <div class="admin-panel" id="adminPanel">
       <h2>Admin-Oberfläche</h2>
-      <button id="downloadAllBtn">Alles herunterladen</button>
+      
+      <div class="admin-controls">
+        <button id="downloadAllBtn" style="background: #795548;">Alles herunterladen</button>
+        <button id="refreshAdminBtn" style="background: #009688;">Aktualisieren</button>
+      </div>
+      
+      <p>Hinweis: Klicken Sie auf den "Öffentlich/Privat"-Button, um die Sichtbarkeit einer Datei zu ändern.</p>
+      
       <ul id="adminFileList"></ul>
       <button id="closeAdminBtn">Admin schließen</button>
     </div>
@@ -608,14 +539,22 @@
     let isPaused = false;
     let isRecording = false;
     
+    // Eigene Uploads speichern
+    let myUploads = [];
+    
     // Geräte- und Format-Erkennung
     const appSettings = {
       adminLoggedIn: false,
       lastFileName: localStorage.getItem('lastFileName') || '',
       isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent) || /Mac/.test(navigator.userAgent) && navigator.maxTouchPoints > 0,
       isSafari: /^((?!chrome|android).)*safari/i.test(navigator.userAgent),
-      bestAudioFormat: 'audio/mp4' // Standard-Fallback für iOS
+      bestAudioFormat: 'audio/mp4', // Standard-Fallback für iOS
+      myUploads: JSON.parse(localStorage.getItem('myUploads') || '[]'),
+      publicFiles: JSON.parse(localStorage.getItem('publicFiles') || '[]')
     };
+    
+    // Lade myUploads aus localStorage
+    myUploads = appSettings.myUploads;
 
     // --- 3) DOM-Elemente ---
     const filenameInput    = document.getElementById("filename");
@@ -631,14 +570,13 @@
     const adminFileList    = document.getElementById("adminFileList");
     const adminLoginBtn    = document.getElementById("adminLoginBtn");
     const closeAdminBtn    = document.getElementById("closeAdminBtn");
+    const refreshAdminBtn  = document.getElementById("refreshAdminBtn");
     const visualizerCircle = document.getElementById("visualizerCircle");
     const downloadAllBtn   = document.getElementById("downloadAllBtn");
     const timerDisplay     = document.getElementById("timerDisplay");
     const recordingStatus  = document.getElementById("recordingStatus");
     const formatInfo       = document.getElementById("formatInfo");
     const currentFormat    = document.getElementById("currentFormat");
-    const microphoneWarning = document.getElementById("microphoneWarning");
-    const iosNote          = document.getElementById("iosNote");
     const tabButtons       = document.querySelectorAll(".tab-button");
     const tabContents      = document.querySelectorAll(".tab-content");
 
@@ -647,13 +585,6 @@
       // Debug-Info für bessere Fehlerbehebung
       console.log("Browser-Info:", navigator.userAgent);
       console.log("Geräteerkennung - iOS:", appSettings.isIOS, "Safari:", appSettings.isSafari);
-      
-      // iOS-spezifische Anzeige
-      if (appSettings.isIOS) {
-        iosNote.style.display = "block";
-      } else {
-        iosNote.style.display = "none";
-      }
       
       // Lade gespeicherte Einstellungen aus dem LocalStorage
       if (appSettings.lastFileName) {
@@ -689,7 +620,21 @@
       return true;
     }
     
-    // --- Neuer Schritt: Beste Audio-Format-Erkennung ---
+    // --- Prüfe/aktualisiere Listen der eigenen und öffentlichen Dateien ---
+    function updateFileVisibilityLists() {
+      // Holt und speichert die aktualisierte Liste der öffentlichen Dateien
+      const publicFiles = JSON.parse(localStorage.getItem('publicFiles') || '[]');
+      appSettings.publicFiles = publicFiles;
+      
+      // Update myUploads aus localStorage
+      appSettings.myUploads = JSON.parse(localStorage.getItem('myUploads') || '[]');
+      myUploads = appSettings.myUploads;
+      
+      console.log("Öffentliche Dateien:", publicFiles);
+      console.log("Meine Uploads:", myUploads);
+    }
+    
+    // --- Beste Audio-Format-Erkennung ---
     async function determineOptimalAudioFormat() {
       // Für iOS-Geräte werden wir diese Formate in dieser Reihenfolge testen
       const formatsToTest = [
@@ -771,6 +716,7 @@
         appSettings.adminLoggedIn = false;
       });
       downloadAllBtn.addEventListener("click", downloadAllFiles);
+      refreshAdminBtn.addEventListener("click", loadAdminFilesWithRetry);
       
       // Tab-Navigation
       tabButtons.forEach(button => {
@@ -786,7 +732,7 @@
         });
       });
 
-      // Dateiliste Löschen (nur für Admin)
+      // Dateiliste Verwalten (für Admin)
       adminFileList.addEventListener("click", handleAdminFileAction);
       
       // Für iOS Touch-Events aktivieren
@@ -822,9 +768,6 @@
       if (!checkBrowserSupport()) return;
       
       try {
-        // Mikrofon-Warnung ausblenden
-        microphoneWarning.style.display = "none";
-        
         // Spezielle Constraints für iOS
         const constraints = {
           audio: true
@@ -846,7 +789,6 @@
           console.error("Mikrofon-Zugriffsfehler:", micError);
           
           if (micError.name === 'NotAllowedError' || micError.name === 'PermissionDeniedError') {
-            microphoneWarning.style.display = "block";
             throw new Error("Mikrofon-Zugriff verweigert. Bitte erteilen Sie die Berechtigung in Ihren Browsereinstellungen.");
           } else if (micError.name === 'NotFoundError') {
             throw new Error("Kein Mikrofon gefunden. Bitte prüfen Sie, ob ein Mikrofon angeschlossen ist.");
@@ -911,9 +853,6 @@
       } catch (err) {
         showError(err.message || "Aufnahmefehler. Bitte versuchen Sie es erneut.");
         console.error("Aufnahmefehler:", err);
-        
-        // Mikrofon-Warnung anzeigen
-        microphoneWarning.style.display = "block";
       }
     }
     
@@ -1079,6 +1018,15 @@
         
         await uploadWithRetry();
         
+        // Speichere in myUploads, dass diese Datei vom Benutzer hochgeladen wurde
+        if (!myUploads.includes(fileName)) {
+          myUploads.push(fileName);
+          localStorage.setItem('myUploads', JSON.stringify(myUploads));
+        }
+        
+        // Als private Datei markieren (nicht öffentlich sichtbar)
+        toggleFileVisibility(fileName, false);
+        
         // Erfolgsmeldung
         showSuccess("✅ Erfolgreich hochgeladen: " + fileName);
         currentRecordingBlob = null;
@@ -1107,6 +1055,9 @@
       try {
         console.log("Dateien werden geladen, Versuch", 4-retries);
         
+        // Aktualisiere die Listen der eigenen und öffentlichen Dateien
+        updateFileVisibilityLists();
+        
         const { data, error } = await supabaseClient.storage
           .from('podcast-audio')
           .list('', { limit: 100, offset: 0, sortBy: { column: 'created_at', order: 'desc' } });
@@ -1122,7 +1073,17 @@
           return;
         }
         
-        for (const file of data) {
+        // Filtere Dateien, die entweder dem Benutzer gehören oder öffentlich sind
+        const visibleFiles = data.filter(file => {
+          return myUploads.includes(file.name) || appSettings.publicFiles.includes(file.name);
+        });
+        
+        if (visibleFiles.length === 0) {
+          fileList.innerHTML = "<li>Keine Aufnahmen vorhanden</li>";
+          return;
+        }
+        
+        for (const file of visibleFiles) {
           const { data: publicUrl } = supabaseClient
             .storage
             .from('podcast-audio')
@@ -1133,7 +1094,7 @@
             <a href="${publicUrl.publicUrl}" target="_blank" download="${file.name}">
               ${file.name}
             </a>
-            <span>(${formatBytes(file.metadata?.size || 0)})</span>
+            <span class="file-size">(${formatBytes(file.metadata?.size || 0)})</span>
           `;
           fileList.appendChild(li);
         }
@@ -1204,6 +1165,9 @@
       try {
         console.log("Admin-Dateien werden geladen, Versuch", 4-retries);
         
+        // Aktualisiere die Listen der öffentlichen Dateien
+        updateFileVisibilityLists();
+        
         const { data, error } = await supabaseClient.storage
           .from('podcast-audio')
           .list('', { limit: 100, offset: 0, sortBy: { column: 'created_at', order: 'desc' } });
@@ -1225,10 +1189,17 @@
             .from('podcast-audio')
             .getPublicUrl(file.name);
           
+          const isPublic = appSettings.publicFiles.includes(file.name);
+          
           const li = document.createElement('li');
+          li.className = isPublic ? 'public-file' : 'private-file';
           li.innerHTML = `
             <a href="${publicUrl.publicUrl}" target="_blank">${file.name}</a>
-            <span>(${formatBytes(file.metadata?.size || 0)})</span>
+            <span class="file-size">(${formatBytes(file.metadata?.size || 0)})</span>
+            <span class="file-visibility">
+              <span class="file-visibility-icon">${isPublic ? '👁️' : '🔒'}</span>
+            </span>
+            <button class="toggle-visibility" data-filename="${file.name}">${isPublic ? 'Privat machen' : 'Öffentlich machen'}</button>
             <button class="delete" data-filename="${file.name}">Löschen</button>
           `;
           adminFileList.appendChild(li);
@@ -1245,29 +1216,72 @@
 
     // --- 17) Admin-Dateiaktionen ---
     async function handleAdminFileAction(e) {
-      if (!e.target.classList.contains("delete")) return;
+      const target = e.target;
       
-      const fileName = e.target.getAttribute("data-filename");
-      
-      if (!confirm(`Sind Sie sicher, dass Sie die Datei "${fileName}" löschen möchten?`)) {
-        return;
-      }
-      
-      try {
-        const { error } = await supabaseClient
-          .storage
-          .from('podcast-audio')
-          .remove([fileName]);
-          
-        if (error) {
-          throw error;
+      // Datei löschen
+      if (target.classList.contains("delete")) {
+        const fileName = target.getAttribute("data-filename");
+        
+        if (!confirm(`Sind Sie sicher, dass Sie die Datei "${fileName}" löschen möchten?`)) {
+          return;
         }
         
-        showSuccess(`Datei '${fileName}' wurde gelöscht.`);
+        try {
+          const { error } = await supabaseClient
+            .storage
+            .from('podcast-audio')
+            .remove([fileName]);
+            
+          if (error) {
+            throw error;
+          }
+          
+          // Entferne aus Listen
+          if (myUploads.includes(fileName)) {
+            myUploads = myUploads.filter(name => name !== fileName);
+            localStorage.setItem('myUploads', JSON.stringify(myUploads));
+          }
+          
+          if (appSettings.publicFiles.includes(fileName)) {
+            appSettings.publicFiles = appSettings.publicFiles.filter(name => name !== fileName);
+            localStorage.setItem('publicFiles', JSON.stringify(appSettings.publicFiles));
+          }
+          
+          showSuccess(`Datei '${fileName}' wurde gelöscht.`);
+          loadFilesWithRetry();
+          loadAdminFilesWithRetry();
+        } catch (err) {
+          showError("Fehler beim Löschen: " + err.message);
+        }
+      }
+      
+      // Sichtbarkeit ändern
+      if (target.classList.contains("toggle-visibility")) {
+        const fileName = target.getAttribute("data-filename");
+        const currentState = appSettings.publicFiles.includes(fileName);
+        
+        toggleFileVisibility(fileName, !currentState);
         loadFilesWithRetry();
         loadAdminFilesWithRetry();
-      } catch (err) {
-        showError("Fehler beim Löschen: " + err.message);
+      }
+    }
+    
+    // --- Sichtbarkeit von Dateien umschalten ---
+    function toggleFileVisibility(fileName, isPublic) {
+      if (isPublic) {
+        // Öffentlich machen
+        if (!appSettings.publicFiles.includes(fileName)) {
+          appSettings.publicFiles.push(fileName);
+          localStorage.setItem('publicFiles', JSON.stringify(appSettings.publicFiles));
+          console.log(`Datei '${fileName}' wurde öffentlich gemacht.`);
+        }
+      } else {
+        // Privat machen
+        if (appSettings.publicFiles.includes(fileName)) {
+          appSettings.publicFiles = appSettings.publicFiles.filter(name => name !== fileName);
+          localStorage.setItem('publicFiles', JSON.stringify(appSettings.publicFiles));
+          console.log(`Datei '${fileName}' wurde privat gemacht.`);
+        }
       }
     }
 
