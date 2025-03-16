@@ -467,7 +467,7 @@
 <body>
   <header>
     <h1>Podcast Aufnahme</h1>
-    <div class="version">v2.6</div>
+    <div class="version">v2.7</div>
   </header>
 
   <div class="container">
@@ -595,6 +595,9 @@
     const SUPABASE_URL = "https://qzmzlrsfuepbkqwzbrir.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6bXpscnNmdWVwYmtxd3picmlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE5NTkxMzAsImV4cCI6MjA1NzUzNTEzMH0.zLZDSfylloUxlxYPEpfO4VMAdf0cNpUzKH2T9qv8ezI";
     
+    // Admin-Passwort für einfachen Zugriff
+    const ADMIN_PASSWORD = "podcast2024";
+    
     // Initialisiere Supabase Client - nur EINMAL für die gesamte App
     let supabaseClient;
     try {
@@ -708,8 +711,10 @@
       // Supabase Client verwenden
       supabaseClient.storage
         .from('podcast-audio')
-        .list()
-        .then(response => {
+        .list('', {
+          sortBy: { column: 'name', order: 'asc' }
+        })
+        .then(async response => {
           if (response.error) {
             throw response.error;
           }
@@ -723,11 +728,26 @@
           
           fileList.innerHTML = "";
           
+          // Metadaten für alle Dateien abrufen
+          for (const file of files) {
+            try {
+              const metadataResponse = await supabaseClient.storage
+                .from('podcast-audio')
+                .getMetadata(file.name);
+              
+              if (metadataResponse.data) {
+                file.metadata = metadataResponse.data;
+              }
+            } catch (err) {
+              console.warn(`Konnte Metadaten für ${file.name} nicht laden:`, err);
+            }
+          }
+          
           // Zur Anzeige ausgewählte Dateien
           const visibleFiles = files.filter(function(file) {
             // Dateien anzeigen, die dem Benutzer gehören ODER öffentlich sind
             const userOwnsFile = myUploads.includes(file.name);
-            const isPublic = isFilePublic(file.name);
+            const isPublic = file.metadata && file.metadata.isPublic === 'true';
             
             return userOwnsFile || isPublic;
           });
@@ -752,7 +772,7 @@
             // Cache-Busting Parameter zum URL hinzufügen
             const noCacheUrl = publicUrl + (publicUrl.includes('?') ? '&' : '?') + '_cb=' + cacheBuster;
             
-            const isPublic = isFilePublic(file.name);
+            const isPublic = file.metadata && file.metadata.isPublic === 'true';
             const isOwner = myUploads.includes(file.name);
             
             const li = document.createElement('li');
@@ -785,8 +805,10 @@
       // Supabase Client verwenden
       supabaseClient.storage
         .from('podcast-audio')
-        .list()
-        .then(response => {
+        .list('', {
+          sortBy: { column: 'name', order: 'asc' }
+        })
+        .then(async response => {
           if (response.error) {
             throw response.error;
           }
@@ -799,6 +821,21 @@
           }
           
           adminFileList.innerHTML = "";
+          
+          // Metadaten für alle Dateien abrufen
+          for (const file of files) {
+            try {
+              const metadataResponse = await supabaseClient.storage
+                .from('podcast-audio')
+                .getMetadata(file.name);
+              
+              if (metadataResponse.data) {
+                file.metadata = metadataResponse.data;
+              }
+            } catch (err) {
+              console.warn(`Konnte Metadaten für ${file.name} nicht laden:`, err);
+            }
+          }
           
           // Cache-Busting Parameter
           const cacheBuster = Date.now();
@@ -815,7 +852,7 @@
             // Cache-Busting Parameter zum URL hinzufügen
             const noCacheUrl = publicUrl + (publicUrl.includes('?') ? '&' : '?') + '_cb=' + cacheBuster;
             
-            const isPublic = isFilePublic(file.name);
+            const isPublic = file.metadata && file.metadata.isPublic === 'true';
             
             const li = document.createElement('li');
             li.className = isPublic ? 'public-file' : 'private-file';
@@ -903,23 +940,51 @@
       return true;
     }
     
-    // --- Datei-Sichtbarkeit verwalten (im localStorage) ---
-    function setFilePublic(fileName, isPublic) {
-      if (isPublic) {
-        // Datei öffentlich machen
-        if (!publicFiles.includes(fileName)) {
-          publicFiles.push(fileName);
+    // --- Datei-Sichtbarkeit verwalten (mit Supabase Metadaten) ---
+    async function setFilePublic(fileName, isPublic) {
+      try {
+        // Zuerst aktuelle Metadaten abrufen
+        const metadataResponse = await supabaseClient.storage
+          .from('podcast-audio')
+          .getMetadata(fileName);
+        
+        const currentMetadata = metadataResponse.data || {};
+        
+        // Metadaten aktualisieren
+        const updatedMetadata = {
+          ...currentMetadata,
+          isPublic: isPublic ? 'true' : 'false',
+          cacheControl: '0' // Cache deaktivieren
+        };
+        
+        // Metadaten auf Supabase aktualisieren
+        const updateResponse = await supabaseClient.storage
+          .from('podcast-audio')
+          .updateMetadata(fileName, updatedMetadata);
+        
+        if (updateResponse.error) {
+          throw updateResponse.error;
         }
-      } else {
-        // Datei privat machen
-        publicFiles = publicFiles.filter(name => name !== fileName);
+        
+        // Auch lokale Liste aktualisieren für besseres UX
+        if (isPublic) {
+          if (!publicFiles.includes(fileName)) {
+            publicFiles.push(fileName);
+          }
+        } else {
+          publicFiles = publicFiles.filter(name => name !== fileName);
+        }
+        
+        // Im localStorage speichern (als Backup)
+        localStorage.setItem('publicFiles', JSON.stringify(publicFiles));
+        appSettings.publicFiles = publicFiles;
+        
+        return true;
+      } catch (error) {
+        console.error("Fehler beim Aktualisieren der Dateisichtbarkeit:", error);
+        showError("Fehler beim Ändern der Sichtbarkeit: " + (error.message || "Unbekannter Fehler"));
+        return false;
       }
-      
-      // Im localStorage speichern
-      localStorage.setItem('publicFiles', JSON.stringify(publicFiles));
-      appSettings.publicFiles = publicFiles;
-      
-      return true;
     }
     
     // --- Prüfe, ob eine Datei öffentlich ist ---
@@ -1059,20 +1124,41 @@
       console.log("Dateiname validiert:", filename, "Start-Button aktiviert:", !startBtn.disabled);
     }
     
-    // --- 7.1) Zeige Password Modal ---
+    // --- 7.1) Admin-Login-Funktion ---
+    function handleAdminLogin() {
+      const enteredPassword = adminPasswordInput.value;
+      
+      if (enteredPassword === ADMIN_PASSWORD) {
+        // Passwort korrekt
+        appSettings.adminLoggedIn = true;
+        hidePasswordModal();
+        adminPanel.style.display = 'block';
+        
+        // Admin-Dateien laden
+        loadAdminFilesByREST();
+        
+        showSuccess("Admin-Bereich freigeschaltet");
+      } else {
+        // Falsches Passwort
+        showError("Falsches Passwort!");
+        adminPasswordInput.value = "";
+        adminPasswordInput.focus();
+      }
+    }
+    
+    // --- 7.2) Zeige Password Modal ---
     function showPasswordModal() {
       passwordModal.style.display = "block";
       adminPasswordInput.value = "";
       adminPasswordInput.focus();
     }
     
-    // --- 7.2) Verstecke Password Modal ---
+    // --- 7.3) Verstecke Password Modal ---
     function hidePasswordModal() {
       passwordModal.style.display = "none";
     }
     
-    // Funktion zum Aktualisieren der Dateilisten
-    // --- 7.3) Lokalen Speicher vollständig löschen ---
+    // --- 7.4) Lokalen Speicher vollständig löschen ---
     function clearAllLocalStorage() {
       if (confirm("Möchten Sie wirklich den gesamten lokalen Speicher löschen? Dies entfernt alle gespeicherten Aufnahmen und Einstellungen.")) {
         // Speicher für aktuelle Aufnahme löschen
@@ -1342,13 +1428,17 @@
       
       console.log("Upload starten: Datei", fileName, "Größe:", formatBytes(currentRecordingBlob.size), "Format:", mimeType);
       
-      // Supabase Storage Upload
+      // Supabase Storage Upload mit Metadaten
       supabaseClient.storage
         .from('podcast-audio')
         .upload(fileName, currentRecordingBlob, { 
           contentType: mimeType,
           upsert: true, // Überschreiben falls Datei existiert
-          cacheControl: '0' // Vermeidet Caching
+          cacheControl: '0', // Vermeidet Caching
+          metadata: {
+            isPublic: 'false', // Standardmäßig privat
+            uploadedBy: 'app-user'
+          }
         })
         .then(function(response) {
           if (response.error) {
@@ -1379,7 +1469,7 @@
         });
     }
 
-    // --- 17) Admin-Dateiaktionen mit echtem Löschen und echter Sichtbarkeitsänderung ---
+    // --- 14) Admin-Dateiaktionen mit echtem Löschen und echter Sichtbarkeitsänderung ---
     function handleAdminFileAction(e) {
       const target = e.target;
       
@@ -1451,34 +1541,41 @@
         target.textContent = "Wird aktualisiert...";
         target.disabled = true;
         
-        // Lokale Sichtbarkeit aktualisieren
-        setFilePublic(fileName, makePublic);
-        
-        // UI-Element direkt aktualisieren
-        const liElement = target.closest('li');
-        if (liElement) {
-          liElement.className = makePublic ? 'public-file' : 'private-file';
-          const iconElement = liElement.querySelector('.file-visibility-icon');
-          if (iconElement) {
-            iconElement.textContent = makePublic ? '👁️' : '🔒';
-          }
-        }
-        
-        // Button aktualisieren
-        target.textContent = makePublic ? 'Privat machen' : 'Öffentlich machen';
-        target.disabled = false;
-        
-        // Erfolgsmeldung
-        showSuccess(`Datei '${fileName}' ist jetzt ${makePublic ? 'öffentlich' : 'privat'}.`);
-        
-        // Hauptliste aktualisieren mit Verzögerung
-        setTimeout(function() {
-          loadFilesByREST();
-        }, 500);
+        // Sichtbarkeit auf dem Server aktualisieren
+        setFilePublic(fileName, makePublic)
+          .then(success => {
+            if (success) {
+              // UI-Element direkt aktualisieren
+              const liElement = target.closest('li');
+              if (liElement) {
+                liElement.className = makePublic ? 'public-file' : 'private-file';
+                const iconElement = liElement.querySelector('.file-visibility-icon');
+                if (iconElement) {
+                  iconElement.textContent = makePublic ? '👁️' : '🔒';
+                }
+              }
+              
+              // Button aktualisieren
+              target.textContent = makePublic ? 'Privat machen' : 'Öffentlich machen';
+              target.disabled = false;
+              
+              // Erfolgsmeldung
+              showSuccess(`Datei '${fileName}' ist jetzt ${makePublic ? 'öffentlich' : 'privat'}.`);
+              
+              // Hauptliste aktualisieren mit Verzögerung
+              setTimeout(function() {
+                loadFilesByREST();
+              }, 500);
+            } else {
+              // Fehlerfall
+              target.textContent = makePublic ? 'Öffentlich machen' : 'Privat machen';
+              target.disabled = false;
+            }
+          });
       }
     }
     
-    // --- 18) Alles herunterladen (ZIP) ---
+    // --- 15) Alles herunterladen (ZIP) ---
     function downloadAllFiles() {
       showMessage("ZIP-Datei wird vorbereitet...", false);
       
@@ -1572,7 +1669,7 @@
         });
     }
 
-    // --- 19) Visualizer Funktionen ---
+    // --- 16) Visualizer Funktionen ---
     function startVisualizer(stream) {
       try {
         // AudioContext erstellen
@@ -1650,7 +1747,7 @@
       visualizerCircle.style.height = "40px";
     }
 
-    // --- 20) Timer Funktionen ---
+    // --- 17) Timer Funktionen ---
     function startTimer() {
       recordingTime = 0;
       updateTimerDisplay(0);
@@ -1689,7 +1786,7 @@
       timerDisplay.textContent = `${mm}:${ss}`;
     }
 
-    // --- 21) UI-Hilfsfunktionen ---
+    // --- 18) UI-Hilfsfunktionen ---
     function updateRecordingUI(isActive, isPaused = false) {
       // Aufnahme aktiv
       if (isActive) {
@@ -1742,7 +1839,7 @@
       uploadStatus.innerHTML = `<span class="success-message">${message}</span>`;
     }
     
-    // --- 22) Lokale Speicherung ---
+    // --- 19) Lokale Speicherung ---
     function saveRecording(blob, mimeType) {
       try {
         // In IndexedDB speichern (vereinfacht mit localStorage)
@@ -1812,7 +1909,7 @@
       }
     }
     
-    // --- 23) Hilfsfunktionen ---
+    // --- 20) Hilfsfunktionen ---
     function formatBytes(bytes, decimals = 2) {
       if (bytes === 0) return '0 Bytes';
       
@@ -1825,7 +1922,7 @@
       return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
     }
     
-    // --- 24) Fenster geladen ---
+    // --- 21) Fenster geladen ---
     window.addEventListener('DOMContentLoaded', function() {
       // Initialisierung starten
       init();
