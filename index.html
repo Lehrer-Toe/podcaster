@@ -465,7 +465,7 @@
 <body>
   <header>
     <h1>Podcast Aufnahme</h1>
-    <div class="version">v1.5</div>
+    <div class="version">v1.6</div>
   </header>
 
   <div class="container">
@@ -673,7 +673,7 @@
     const cancelLoginBtn    = document.getElementById("cancelLoginBtn");
 
     // --- 4) Initialisierung ---
-    async function init() {
+    function init() {
       // Debug-Info für bessere Fehlerbehebung
       console.log("Browser-Info:", navigator.userAgent);
       console.log("Geräteerkennung - iOS:", appSettings.isIOS, "Safari:", appSettings.isSafari);
@@ -693,16 +693,21 @@
       if (!checkBrowserSupport()) return;
       
       // Bestimme das beste Audio-Format für diesen Browser
-      await determineOptimalAudioFormat();
-      
-      // Setze Event Listeners
-      setupEventListeners();
-      
-      // Prüfe, ob es eine gespeicherte Aufnahme gibt
-      checkForSavedRecording();
-      
-      // Lade vorhandene Dateien
-      await loadFiles();
+      determineOptimalAudioFormat()
+        .then(() => {
+          // Setze Event Listeners
+          setupEventListeners();
+          
+          // Prüfe, ob es eine gespeicherte Aufnahme gibt
+          checkForSavedRecording();
+          
+          // Lade vorhandene Dateien
+          return loadFiles();
+        })
+        .catch(err => {
+          console.error("Fehler bei der Initialisierung:", err);
+          showError("Fehler beim Starten der App. Bitte Seite neu laden.");
+        });
     }
 
     // --- Function: Cache löschen ---
