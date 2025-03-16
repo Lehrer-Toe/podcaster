@@ -467,7 +467,7 @@
 <body>
   <header>
     <h1>Podcast Aufnahme</h1>
-    <div class="version">v2.2</div>
+    <div class="version">v2.3</div>
   </header>
 
   <div class="container">
@@ -630,11 +630,11 @@
       clearLocalCache();
       
       // Dateilisten neu laden ohne neuen Client zu erstellen
-      loadFiles();
+      loadFilesByREST();
       
       // Admin-Dateien neu laden, falls im Admin-Bereich
       if (appSettings.adminLoggedIn) {
-        loadAdminFiles();
+        loadAdminFilesByREST();
       }
     }
 
@@ -701,151 +701,145 @@
     const confirmLoginBtn   = document.getElementById("confirmLoginBtn");
     const cancelLoginBtn    = document.getElementById("cancelLoginBtn");
 
-    // Funktion zum Laden der Dateien über direkte REST-API
+    // Funktion zum Laden der Dateien über den Supabase-Client
     function loadFilesByREST() {
       fileList.innerHTML = "<li>Dateien werden geladen...</li>";
       
-      // Cache-Busting Parameter hinzufügen
-      const cacheBuster = Date.now();
-      const url = `${SUPABASE_URL}/storage/v1/object/list/podcast-audio`;
-      
-      fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
-        }
-      })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP-Status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then(data => {
-        const files = data || [];
-        
-        if (!files || files.length === 0) {
-          fileList.innerHTML = "<li>Keine Aufnahmen vorhanden</li>";
-          return;
-        }
-        
-        fileList.innerHTML = "";
-        
-        // Zur Anzeige ausgewählte Dateien
-        const visibleFiles = files.filter(function(file) {
-          // Dateien anzeigen, die dem Benutzer gehören ODER öffentlich sind
-          const userOwnsFile = myUploads.includes(file.name);
-          const isPublic = isFilePublic(file.name);
-          
-          return userOwnsFile || isPublic;
-        });
-        
-        if (visibleFiles.length === 0) {
-          fileList.innerHTML = "<li>Keine sichtbaren Aufnahmen vorhanden</li>";
-          return;
-        }
-        
-        // Liste erstellen
-        for (const file of visibleFiles) {
-          const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/podcast-audio/${encodeURIComponent(file.name)}`;
-          
-          // Cache-Busting Parameter zum URL hinzufügen
-          const noCacheUrl = publicUrl + (publicUrl.includes('?') ? '&' : '?') + '_cb=' + cacheBuster;
-          
-          const isPublic = isFilePublic(file.name);
-          const isOwner = myUploads.includes(file.name);
-          
-          const li = document.createElement('li');
-          if (isPublic) {
-            li.className = 'public-file';
+      // Supabase Client verwenden
+      supabaseClient.storage
+        .from('podcast-audio')
+        .list()
+        .then(response => {
+          if (response.error) {
+            throw response.error;
           }
           
-          li.innerHTML = `
-            <a href="${noCacheUrl}" target="_blank" download="${file.name}">
-              ${file.name}
-            </a>
-            <span class="file-size">(${formatBytes(file.metadata?.size || 0)})</span>
-            ${isPublic ? '<span class="file-visibility-icon">👁️</span>' : ''}
-            ${isOwner ? ' (Meine Datei)' : ''}
-          `;
+          const files = response.data || [];
           
-          fileList.appendChild(li);
-        }
-      })
-      .catch(function(err) {
-        console.error("Fehler beim Laden der Dateien:", err);
-        fileList.innerHTML = "<li class='error-message'>Fehler beim Laden der Dateien</li>";
-      });
+          if (!files || files.length === 0) {
+            fileList.innerHTML = "<li>Keine Aufnahmen vorhanden</li>";
+            return;
+          }
+          
+          fileList.innerHTML = "";
+          
+          // Zur Anzeige ausgewählte Dateien
+          const visibleFiles = files.filter(function(file) {
+            // Dateien anzeigen, die dem Benutzer gehören ODER öffentlich sind
+            const userOwnsFile = myUploads.includes(file.name);
+            const isPublic = isFilePublic(file.name);
+            
+            return userOwnsFile || isPublic;
+          });
+          
+          if (visibleFiles.length === 0) {
+            fileList.innerHTML = "<li>Keine sichtbaren Aufnahmen vorhanden</li>";
+            return;
+          }
+          
+          // Cache-Busting Parameter
+          const cacheBuster = Date.now();
+          
+          // Liste erstellen
+          for (const file of visibleFiles) {
+            // Öffentliche URL generieren
+            const { data } = supabaseClient.storage
+              .from('podcast-audio')
+              .getPublicUrl(file.name);
+              
+            const publicUrl = data.publicUrl;
+            
+            // Cache-Busting Parameter zum URL hinzufügen
+            const noCacheUrl = publicUrl + (publicUrl.includes('?') ? '&' : '?') + '_cb=' + cacheBuster;
+            
+            const isPublic = isFilePublic(file.name);
+            const isOwner = myUploads.includes(file.name);
+            
+            const li = document.createElement('li');
+            if (isPublic) {
+              li.className = 'public-file';
+            }
+            
+            li.innerHTML = `
+              <a href="${noCacheUrl}" target="_blank" download="${file.name}">
+                ${file.name}
+              </a>
+              <span class="file-size">(${formatBytes(file.metadata?.size || 0)})</span>
+              ${isPublic ? '<span class="file-visibility-icon">👁️</span>' : ''}
+              ${isOwner ? ' (Meine Datei)' : ''}
+            `;
+            
+            fileList.appendChild(li);
+          }
+        })
+        .catch(function(err) {
+          console.error("Fehler beim Laden der Dateien:", err);
+          fileList.innerHTML = "<li class='error-message'>Fehler beim Laden der Dateien: " + (err.message || "Unbekannter Fehler") + "</li>";
+        });
     }
 
-    // Funktion zum Laden der Admin-Dateien über direkte REST-API
+    // Funktion zum Laden der Admin-Dateien
     function loadAdminFilesByREST() {
       adminFileList.innerHTML = "<li>Dateien werden geladen...</li>";
       
-      // Cache-Busting Parameter hinzufügen
-      const cacheBuster = Date.now();
-      const url = `${SUPABASE_URL}/storage/v1/object/list/podcast-audio`;
-      
-      fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
-        }
-      })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP-Status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then(data => {
-        const files = data || [];
-        
-        if (!files || files.length === 0) {
-          adminFileList.innerHTML = "<li>Keine Aufnahmen vorhanden</li>";
-          return;
-        }
-        
-        adminFileList.innerHTML = "";
-        
-        // Admin-Liste erstellen
-        for (const file of files) {
-          const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/podcast-audio/${encodeURIComponent(file.name)}`;
+      // Supabase Client verwenden
+      supabaseClient.storage
+        .from('podcast-audio')
+        .list()
+        .then(response => {
+          if (response.error) {
+            throw response.error;
+          }
           
-          // Cache-Busting Parameter zum URL hinzufügen
-          const noCacheUrl = publicUrl + (publicUrl.includes('?') ? '&' : '?') + '_cb=' + cacheBuster;
+          const files = response.data || [];
           
-          const isPublic = isFilePublic(file.name);
+          if (!files || files.length === 0) {
+            adminFileList.innerHTML = "<li>Keine Aufnahmen vorhanden</li>";
+            return;
+          }
           
-          const li = document.createElement('li');
-          li.className = isPublic ? 'public-file' : 'private-file';
-          li.dataset.filename = file.name;
+          adminFileList.innerHTML = "";
           
-          li.innerHTML = `
-            <a href="${noCacheUrl}" target="_blank">${file.name}</a>
-            <span class="file-size">(${formatBytes(file.metadata?.size || 0)})</span>
-            <span class="file-visibility">
-              <span class="file-visibility-icon">${isPublic ? '👁️' : '🔒'}</span>
-            </span>
-            <button class="toggle-visibility" data-filename="${file.name}">
-              ${isPublic ? 'Privat machen' : 'Öffentlich machen'}
-            </button>
-            <button class="delete" data-filename="${file.name}">Löschen</button>
-          `;
+          // Cache-Busting Parameter
+          const cacheBuster = Date.now();
           
-          adminFileList.appendChild(li);
-        }
-      })
-      .catch(function(err) {
-        console.error("Fehler beim Laden der Admin-Dateien:", err);
-        adminFileList.innerHTML = "<li class='error-message'>Fehler beim Laden der Dateien</li>";
-      });
+          // Admin-Liste erstellen
+          for (const file of files) {
+            // Öffentliche URL generieren
+            const { data } = supabaseClient.storage
+              .from('podcast-audio')
+              .getPublicUrl(file.name);
+              
+            const publicUrl = data.publicUrl;
+            
+            // Cache-Busting Parameter zum URL hinzufügen
+            const noCacheUrl = publicUrl + (publicUrl.includes('?') ? '&' : '?') + '_cb=' + cacheBuster;
+            
+            const isPublic = isFilePublic(file.name);
+            
+            const li = document.createElement('li');
+            li.className = isPublic ? 'public-file' : 'private-file';
+            li.dataset.filename = file.name;
+            
+            li.innerHTML = `
+              <a href="${noCacheUrl}" target="_blank">${file.name}</a>
+              <span class="file-size">(${formatBytes(file.metadata?.size || 0)})</span>
+              <span class="file-visibility">
+                <span class="file-visibility-icon">${isPublic ? '👁️' : '🔒'}</span>
+              </span>
+              <button class="toggle-visibility" data-filename="${file.name}">
+                ${isPublic ? 'Privat machen' : 'Öffentlich machen'}
+              </button>
+              <button class="delete" data-filename="${file.name}">Löschen</button>
+            `;
+            
+            adminFileList.appendChild(li);
+          }
+        })
+        .catch(function(err) {
+          console.error("Fehler beim Laden der Admin-Dateien:", err);
+          adminFileList.innerHTML = "<li class='error-message'>Fehler beim Laden der Dateien: " + (err.message || "Unbekannter Fehler") + "</li>";
+        });
     }
 
     // --- 4) Initialisierung ---
@@ -1016,7 +1010,7 @@
         appSettings.adminLoggedIn = false;
       });
       downloadAllBtn.addEventListener("click", downloadAllFiles);
-      refreshAdminBtn.addEventListener("click", loadAdminFiles);
+      refreshAdminBtn.addEventListener("click", loadAdminFilesByREST);
       
       // Password Modal
       confirmLoginBtn.addEventListener("click", handleAdminLogin);
@@ -1106,7 +1100,7 @@
         uploadBtn.disabled = true;
         
         // Dateiliste aktualisieren
-        loadFiles();
+        loadFilesByREST();
         
         showSuccess("Lokaler Speicher wurde vollständig gelöscht.");
       }
@@ -1459,7 +1453,7 @@
         })
         .catch(function(err) {
           console.error("Fehler beim Laden der Dateien:", err);
-          fileList.innerHTML = "<li class='error-message'>Fehler beim Laden der Dateien</li>";
+          fileList.innerHTML = "<li class='error-message'>Fehler beim Laden der Dateien: " + (err.message || "Unbekannter Fehler") + "</li>";
         });
     }
 
@@ -1543,7 +1537,7 @@
         })
         .catch(function(err) {
           console.error("Fehler beim Laden der Admin-Dateien:", err);
-          adminFileList.innerHTML = "<li class='error-message'>Fehler beim Laden der Dateien</li>";
+          adminFileList.innerHTML = "<li class='error-message'>Fehler beim Laden der Dateien: " + (err.message || "Unbekannter Fehler") + "</li>";
         });
     }
 
@@ -1563,67 +1557,49 @@
         target.textContent = "Wird gelöscht...";
         target.disabled = true;
         
-        // Direkte REST-API verwenden statt Supabase-Client
-        const encodedFileName = encodeURIComponent(fileName);
-        const url = `${SUPABASE_URL}/storage/v1/object/podcast-audio/${encodedFileName}`;
-        
-        // HTTP-DELETE direkt mit fetch
-        fetch(url, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache'
-          }
-        })
-        .then(function(response) {
-          if (!response.ok) {
-            if (response.status === 404) {
-              console.log("Datei wurde nicht gefunden (404), könnte bereits gelöscht sein");
-              // Trotzdem als Erfolg behandeln
-              return { success: true };
+        // Supabase Client verwenden statt direktes REST-API
+        supabaseClient.storage
+          .from('podcast-audio')
+          .remove([fileName])
+          .then(function(response) {
+            if (response.error) {
+              throw response.error;
             }
-            throw new Error(`HTTP-Status: ${response.status}`);
-          }
-          return { success: true };
-        })
-        .then(function() {
-          console.log("Datei erfolgreich gelöscht:", fileName);
-          
-          // Aus der öffentlichen Liste entfernen
-          if (publicFiles.includes(fileName)) {
-            setFilePublic(fileName, false);
-          }
-          
-          // Entferne aus myUploads
-          if (myUploads.includes(fileName)) {
-            myUploads = myUploads.filter(name => name !== fileName);
-            localStorage.setItem('myUploads', JSON.stringify(myUploads));
-            appSettings.myUploads = myUploads;
-          }
-          
-          // Entferne das Element direkt aus der DOM
-          const liElement = adminFileList.querySelector(`li[data-filename="${fileName}"]`);
-          if (liElement) {
-            liElement.remove();
-          }
-          
-          showSuccess(`Datei '${fileName}' wurde gelöscht.`);
-          
-          // Dateilisten aktualisieren nach kurzer Verzögerung
-          setTimeout(function() {
-            // Direkt die Listen neu laden ohne Supabase-Client
-            loadFilesByREST();
-            loadAdminFilesByREST();
-          }, 1000);
-        })
-        .catch(function(err) {
-          console.error("Fehler beim Löschen:", err);
-          showError(`Fehler beim Löschen: ${err.message || "Unbekannter Fehler"}`);
-          target.textContent = "Löschen";
-          target.disabled = false;
-        });
+            
+            console.log("Datei erfolgreich gelöscht:", fileName);
+            
+            // Aus der öffentlichen Liste entfernen
+            if (publicFiles.includes(fileName)) {
+              setFilePublic(fileName, false);
+            }
+            
+            // Entferne aus myUploads
+            if (myUploads.includes(fileName)) {
+              myUploads = myUploads.filter(name => name !== fileName);
+              localStorage.setItem('myUploads', JSON.stringify(myUploads));
+              appSettings.myUploads = myUploads;
+            }
+            
+            // Entferne das Element direkt aus der DOM
+            const liElement = adminFileList.querySelector(`li[data-filename="${fileName}"]`);
+            if (liElement) {
+              liElement.remove();
+            }
+            
+            showSuccess(`Datei '${fileName}' wurde gelöscht.`);
+            
+            // Dateilisten aktualisieren nach kurzer Verzögerung
+            setTimeout(function() {
+              loadFilesByREST();
+              loadAdminFilesByREST();
+            }, 1000);
+          })
+          .catch(function(err) {
+            console.error("Fehler beim Löschen:", err);
+            showError(`Fehler beim Löschen: ${err.message || "Unbekannter Fehler"}`);
+            target.textContent = "Löschen";
+            target.disabled = false;
+          });
       }
       
       // Sichtbarkeit ändern
