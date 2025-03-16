@@ -465,7 +465,7 @@
 <body>
   <header>
     <h1>Podcast Aufnahme</h1>
-    <div class="version">v1.2</div>
+    <div class="version">v1.4</div>
   </header>
 
   <div class="container">
@@ -598,7 +598,11 @@
     // Initialisiere Supabase Client
     let supabaseClient;
     try {
-      supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: false // Keine Session speichern
+        }
+      });
       console.log("Supabase Client erfolgreich initialisiert");
     } catch (err) {
       console.error("Fehler bei der Supabase-Initialisierung:", err);
@@ -897,7 +901,8 @@
       passwordModal.style.display = "none";
     }
     
-    // --- 7.3) Lokalen Speicher vollständig löschen ---
+    // Funktion zum erzwungenen Neuladen aller Dateien
+    async     // --- 7.3) Lokalen Speicher vollständig löschen ---
     function clearAllLocalStorage() {
       if (confirm("Möchten Sie wirklich den gesamten lokalen Speicher löschen? Dies entfernt alle gespeicherten Aufnahmen und Einstellungen.")) {
         // Speicher für aktuelle Aufnahme löschen
@@ -1205,14 +1210,25 @@
       fileList.innerHTML = "<li>Dateien werden geladen...</li>";
       
       try {
-        // Alle Dateien aus dem Storage abrufen
-        const { data: files, error } = await supabaseClient.storage
-          .from('podcast-audio')
-          .list('', { limit: 100, sortBy: { column: 'created_at', order: 'desc' } });
+        // Direkte REST-API-Abfrage, um den Cache zu umgehen
+        const listUrl = `${SUPABASE_URL}/storage/v1/bucket/podcast-audio/list?prefix=&limit=100&sortBy=created_at&sortOrder=desc`;
         
-        if (error) {
-          throw error;
+        const response = await fetch(listUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP Fehler ${response.status}`);
         }
+        
+        const data = await response.json();
+        const files = data || [];
         
         if (!files || files.length === 0) {
           fileList.innerHTML = "<li>Keine Aufnahmen vorhanden</li>";
@@ -1290,16 +1306,13 @@
       adminFileList.innerHTML = "<li>Dateien werden geladen...</li>";
       
       try {
-        // Neue Abfrage mit URL-Parameter für Cache-Busting
-        const cacheBuster = Date.now();
+        // Verwendung des Supabase-Clients mit neuer Abfrage-Option
         const { data: files, error } = await supabaseClient.storage
           .from('podcast-audio')
           .list('', { 
-            limit: 100, 
-            sortBy: { column: 'created_at', order: 'desc' },
-            // Setze den Cache-Parameter für die API
-            // @ts-ignore
-            cacheBuster: cacheBuster
+            limit: 100,
+            offset: 0,
+            sortBy: { column: 'created_at', order: 'desc' }
           });
         
         if (error) {
@@ -1363,28 +1376,18 @@
           target.textContent = "Wird gelöscht...";
           target.disabled = true;
           
-          // Direkte REST-API verwenden statt Supabase-Client
-          // URL für die Dateilöschung in Supabase Storage
-          const fileUrl = `${SUPABASE_URL}/storage/v1/object/podcast-audio/${encodeURIComponent(fileName)}`;
+          // Standard Supabase Methode noch einmal versuchen
+          const { error } = await supabaseClient
+            .storage
+            .from('podcast-audio')
+            .remove([fileName]);
           
-          // Direkter API-Aufruf mit Fetch
-          const response = await fetch(fileUrl, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-              'Content-Type': 'application/json',
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache'
-            }
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(`HTTP Fehler ${response.status}: ${errorData.error || response.statusText}`);
+          if (error) {
+            console.error("Fehler beim Löschen mit Supabase Client:", error);
+            throw error;
           }
           
-          // Überprüfen, ob die Datei wirklich gelöscht wurde
-          console.log(`Datei ${fileName} gelöscht. HTTP-Status: ${response.status}`);
+          console.log("Datei erfolgreich gelöscht:", fileName);
           
           // Aus der öffentlichen Liste entfernen
           if (publicFiles.includes(fileName)) {
@@ -1406,12 +1409,10 @@
           
           showSuccess(`Datei '${fileName}' wurde gelöscht.`);
           
-          // Verzögerung, um dem Server Zeit zu geben
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Dateilisten aktualisieren
-          await loadFiles();
-          await loadAdminFiles();
+          // Aktualisieren der Listen nach 2 Sekunden
+          setTimeout(async () => {
+            await forceReloadFiles();
+          }, 2000);
         } catch (err) {
           console.error("Fehler beim Löschen:", err);
           showError(`Fehler beim Löschen: ${err.message || "Unbekannter Fehler"}`);
