@@ -76,7 +76,7 @@
       margin-bottom: 0.5rem;
     }
     
-    input[type="text"] {
+    input[type="text"], input[type="password"] {
       width: 100%;
       padding: 0.75rem 1rem;
       font-size: 1rem;
@@ -87,7 +87,7 @@
       appearance: none;
     }
     
-    input[type="text"]:focus {
+    input[type="text"]:focus, input[type="password"]:focus {
       outline: none;
       border-color: #4CAF50;
       box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.2);
@@ -405,6 +405,40 @@
       background-color: #f8f9fa;
     }
     
+    /* --- Password Modal --- */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+    }
+    
+    .modal-content {
+      background-color: #fff;
+      margin: 15% auto;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+      max-width: 400px;
+      width: 90%;
+    }
+    
+    .modal-title {
+      margin-top: 0;
+      color: #4caf50;
+    }
+    
+    .modal-footer {
+      margin-top: 1.5rem;
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.8rem;
+    }
+    
     /* iPad-spezifische Styles */
     @media (max-width: 1024px) and (-webkit-min-device-pixel-ratio: 2), 
            (max-width: 1024px) and (min-resolution: 192dpi) {
@@ -530,6 +564,19 @@
     <button id="adminLoginBtn">Admin Login</button>
   </div>
 
+  <!-- Password Modal -->
+  <div id="passwordModal" class="modal">
+    <div class="modal-content">
+      <h3 class="modal-title">Admin Login</h3>
+      <p>Bitte geben Sie das Admin-Passwort ein:</p>
+      <input type="password" id="adminPasswordInput" placeholder="Passwort">
+      <div class="modal-footer">
+        <button id="cancelLoginBtn" style="background-color: #f44336;">Abbrechen</button>
+        <button id="confirmLoginBtn" style="background-color: #4CAF50;">Anmelden</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Supabase (ES-Modul) -->
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -563,8 +610,8 @@
     // Eigene Uploads speichern
     let myUploads = [];
     
-    // Präfix für öffentliche Dateien
-    const PUBLIC_PREFIX = "public_";
+    // Tabelle für die Sichtbarkeit der Dateien (öffentlich/privat)
+    const visibilityTable = 'file_visibility'; // Name der Tabelle in Supabase
     
     // Geräte- und Format-Erkennung
     const appSettings = {
@@ -603,6 +650,12 @@
     const currentFormat    = document.getElementById("currentFormat");
     const tabButtons       = document.querySelectorAll(".tab-button");
     const tabContents      = document.querySelectorAll(".tab-content");
+    
+    // Password Modal Elemente
+    const passwordModal     = document.getElementById("passwordModal");
+    const adminPasswordInput = document.getElementById("adminPasswordInput");
+    const confirmLoginBtn   = document.getElementById("confirmLoginBtn");
+    const cancelLoginBtn    = document.getElementById("cancelLoginBtn");
 
     // --- 4) Initialisierung ---
     async function init() {
@@ -624,14 +677,51 @@
       // Bestimme das beste Audio-Format für diesen Browser
       await determineOptimalAudioFormat();
       
-      // Lade vorhandene Dateien mit Fehlerbehandlung
-      loadFilesWithRetry();
-      
       // Setze Event Listeners
       setupEventListeners();
       
       // Prüfe, ob es eine gespeicherte Aufnahme gibt
       checkForSavedRecording();
+      
+      // Lade vorhandene Dateien
+      await loadFilesWithRetry();
+      
+      // Initialisiere File Visibility Tabelle, falls sie noch nicht existiert
+      await initFileVisibilityTable();
+    }
+    
+    // --- 4.1) Initialisiere File Visibility Tabelle ---
+    async function initFileVisibilityTable() {
+      try {
+        // Prüfe, ob Tabelle existiert
+        const { error: checkError } = await supabaseClient
+          .from(visibilityTable)
+          .select('id', { count: 'exact', head: true });
+        
+        if (checkError) {
+          console.log("Visibility Tabelle existiert noch nicht oder ist nicht zugänglich. Initialisiere...");
+          await createVisibilityTable();
+        } else {
+          console.log("Visibility Tabelle existiert bereits.");
+        }
+      } catch (error) {
+        console.error("Fehler bei der Tabellen-Initialisierung:", error);
+      }
+    }
+    
+    // --- 4.2) Erstelle File Visibility Tabelle ---
+    async function createVisibilityTable() {
+      try {
+        const { error } = await supabaseClient.rpc('create_visibility_table');
+        
+        if (error) {
+          console.error("Fehler beim Erstellen der Visibility Tabelle:", error);
+        } else {
+          console.log("Visibility Tabelle erfolgreich erstellt.");
+        }
+      } catch (error) {
+        console.error("Fehler beim Erstellen der Visibility Tabelle:", error);
+      }
     }
 
     // --- 5) Browser-Unterstützung prüfen ---
@@ -645,23 +735,24 @@
     }
     
     // --- 5.1) Prüfen, ob eine Datei öffentlich ist ---
-    function isFilePublic(fileName) {
-      return fileName.startsWith(PUBLIC_PREFIX);
-    }
-    
-    // --- 5.2) Dateiname für öffentliche/private Dateien anpassen ---
-    function makeFileNamePublic(fileName) {
-      if (!fileName.startsWith(PUBLIC_PREFIX)) {
-        return PUBLIC_PREFIX + fileName;
+    async function isFilePublic(fileName) {
+      try {
+        const { data, error } = await supabaseClient
+          .from(visibilityTable)
+          .select('is_public')
+          .eq('filename', fileName)
+          .single();
+          
+        if (error) {
+          console.warn("Fehler beim Prüfen der Datei-Sichtbarkeit:", error);
+          return false;
+        }
+        
+        return data?.is_public || false;
+      } catch (error) {
+        console.error("Fehler beim Prüfen der Datei-Sichtbarkeit:", error);
+        return false;
       }
-      return fileName;
-    }
-    
-    function makeFileNamePrivate(fileName) {
-      if (fileName.startsWith(PUBLIC_PREFIX)) {
-        return fileName.substring(PUBLIC_PREFIX.length);
-      }
-      return fileName;
     }
     
     // --- Beste Audio-Format-Erkennung ---
@@ -741,13 +832,22 @@
       clearStorageBtn.addEventListener("click", clearAllLocalStorage);
       
       // Admin-Bereich
-      adminLoginBtn.addEventListener("click", handleAdminLogin);
+      adminLoginBtn.addEventListener("click", showPasswordModal);
       closeAdminBtn.addEventListener("click", () => {
         adminPanel.style.display = "none";
         appSettings.adminLoggedIn = false;
       });
       downloadAllBtn.addEventListener("click", downloadAllFiles);
       refreshAdminBtn.addEventListener("click", loadAdminFilesWithRetry);
+      
+      // Password Modal
+      confirmLoginBtn.addEventListener("click", handleAdminLogin);
+      cancelLoginBtn.addEventListener("click", hidePasswordModal);
+      adminPasswordInput.addEventListener("keyup", (e) => {
+        if (e.key === "Enter") {
+          handleAdminLogin();
+        }
+      });
       
       // Tab-Navigation
       tabButtons.forEach(button => {
@@ -787,7 +887,19 @@
       console.log("Dateiname validiert:", filename, "Start-Button aktiviert:", !startBtn.disabled);
     }
     
-    // --- 7.1) Lokalen Speicher vollständig löschen ---
+    // --- 7.1) Zeige Password Modal ---
+    function showPasswordModal() {
+      passwordModal.style.display = "block";
+      adminPasswordInput.value = "";
+      adminPasswordInput.focus();
+    }
+    
+    // --- 7.2) Verstecke Password Modal ---
+    function hidePasswordModal() {
+      passwordModal.style.display = "none";
+    }
+    
+    // --- 7.3) Lokalen Speicher vollständig löschen ---
     function clearAllLocalStorage() {
       if (confirm("Möchten Sie wirklich den gesamten lokalen Speicher löschen? Dies entfernt alle gespeicherten Aufnahmen und Einstellungen.")) {
         // Speicher für aktuelle Aufnahme löschen
@@ -1081,6 +1193,9 @@
           appSettings.myUploads = myUploads;
         }
         
+        // Setze Datei-Sichtbarkeit auf privat (nicht öffentlich)
+        await setFileVisibility(fileName, false);
+        
         // Erfolgsmeldung
         showSuccess("✅ Erfolgreich hochgeladen: " + fileName);
         currentRecordingBlob = null;
@@ -1109,27 +1224,36 @@
       try {
         console.log("Dateien werden geladen, Versuch", 4-retries);
         
-        const { data, error } = await supabaseClient.storage
+        // Alle Dateien aus dem Storage abrufen
+        const { data: allFiles, error: storageError } = await supabaseClient.storage
           .from('podcast-audio')
           .list('', { limit: 100, offset: 0, sortBy: { column: 'created_at', order: 'desc' } });
         
-        if (error) {
-          throw error;
+        if (storageError) {
+          throw storageError;
         }
+        
+        // Hole alle öffentlichen Dateien aus der Visibility-Tabelle
+        const { data: publicFiles, error: visibilityError } = await supabaseClient
+          .from(visibilityTable)
+          .select('filename')
+          .eq('is_public', true);
+          
+        if (visibilityError) {
+          console.warn("Fehler beim Laden der öffentlichen Dateien:", visibilityError);
+        }
+        
+        // Erstelle eine Liste von öffentlichen Dateinamen
+        const publicFileNames = publicFiles ? publicFiles.map(item => item.filename) : [];
+        
+        // Filtere Dateien, die entweder dem Benutzer gehören oder öffentlich sind
+        const visibleFiles = allFiles.filter(file => {
+          return myUploads.includes(file.name) || publicFileNames.includes(file.name);
+        });
         
         fileList.innerHTML = "";
         
-        if (!data || data.length === 0) {
-          fileList.innerHTML = "<li>Keine Aufnahmen vorhanden</li>";
-          return;
-        }
-        
-        // Filtere Dateien, die entweder dem Benutzer gehören oder öffentlich sind
-        const visibleFiles = data.filter(file => {
-          return myUploads.includes(file.name) || isFilePublic(file.name);
-        });
-        
-        if (visibleFiles.length === 0) {
+        if (!visibleFiles || visibleFiles.length === 0) {
           fileList.innerHTML = "<li>Keine Aufnahmen vorhanden</li>";
           return;
         }
@@ -1141,7 +1265,9 @@
             .getPublicUrl(file.name);
           
           const li = document.createElement('li');
-          if (isFilePublic(file.name)) {
+          const isFileVisibleToAll = publicFileNames.includes(file.name);
+          
+          if (isFileVisibleToAll) {
             li.className = 'public-file';
           }
           
@@ -1165,30 +1291,13 @@
 
     // --- 15) Admin-Bereich ---
     function handleAdminLogin() {
-      // WARNUNG: In Produktion sollte das Passwort nicht im Client-Code sein
-      // Besser: Server-seitige Authentifizierung
-      const storedHash = localStorage.getItem('adminHash');
+      const password = adminPasswordInput.value;
       
-      if (storedHash) {
-        // Hash aus LocalStorage verwenden (Nutzer bereits angemeldet)
-        const pwd = prompt("Bitte Admin-Passwort eingeben:");
-        
-        if (pwd && hashPassword(pwd) === storedHash) {
-          showAdminPanel();
-        } else {
-          alert("Falsches Passwort!");
-        }
+      if (password === "Luna") {
+        hidePasswordModal();
+        showAdminPanel();
       } else {
-        // Neues Passwort speichern (Demo-Zwecke)
-        const pwd = prompt("Bitte Admin-Passwort eingeben:");
-        
-        if (pwd === "Luna") {
-          // Passwort hashen und im LocalStorage speichern
-          localStorage.setItem('adminHash', hashPassword(pwd));
-          showAdminPanel();
-        } else {
-          alert("Falsches Passwort!");
-        }
+        alert("Falsches Passwort!");
       }
     }
     
@@ -1196,16 +1305,6 @@
       adminPanel.style.display = "block";
       appSettings.adminLoggedIn = true;
       loadAdminFilesWithRetry();
-    }
-    
-    // Einfache Hash-Funktion (nur für Demo, nicht sicher!)
-    function hashPassword(password) {
-      let hash = 0;
-      for (let i = 0; i < password.length; i++) {
-        hash = ((hash << 5) - hash) + password.charCodeAt(i);
-        hash = hash & hash; // Convert to 32bit integer
-      }
-      return hash.toString(16);
     }
 
     // --- 16) Admin-Dateien laden ---
@@ -1220,6 +1319,7 @@
       try {
         console.log("Admin-Dateien werden geladen, Versuch", 4-retries);
         
+        // Alle Dateien aus dem Storage abrufen
         const { data, error } = await supabaseClient.storage
           .from('podcast-audio')
           .list('', { limit: 100, offset: 0, sortBy: { column: 'created_at', order: 'desc' } });
@@ -1235,13 +1335,30 @@
           return;
         }
         
+        // Hole alle Dateien aus der Visibility-Tabelle
+        const { data: visibilityData, error: visibilityError } = await supabaseClient
+          .from(visibilityTable)
+          .select('filename, is_public');
+          
+        if (visibilityError) {
+          console.warn("Fehler beim Laden der Datei-Sichtbarkeit:", visibilityError);
+        }
+        
+        // Erstelle ein Map für schnellen Zugriff
+        const visibilityMap = {};
+        if (visibilityData) {
+          visibilityData.forEach(item => {
+            visibilityMap[item.filename] = item.is_public;
+          });
+        }
+        
         for (const file of data) {
           const { data: publicUrl } = supabaseClient
             .storage
             .from('podcast-audio')
             .getPublicUrl(file.name);
           
-          const isPublic = isFilePublic(file.name);
+          const isPublic = visibilityMap[file.name] || false;
           
           const li = document.createElement('li');
           li.className = isPublic ? 'public-file' : 'private-file';
@@ -1279,6 +1396,13 @@
         }
         
         try {
+          // Zuerst den Eintrag aus der Visibility-Tabelle löschen
+          await supabaseClient
+            .from(visibilityTable)
+            .delete()
+            .eq('filename', fileName);
+          
+          // Dann die Datei aus dem Storage löschen
           const { error } = await supabaseClient
             .storage
             .from('podcast-audio')
@@ -1299,6 +1423,7 @@
           loadFilesWithRetry();
           loadAdminFilesWithRetry();
         } catch (err) {
+          console.error("Fehler beim Löschen:", err);
           showError("Fehler beim Löschen: " + err.message);
         }
       }
@@ -1306,16 +1431,24 @@
       // Sichtbarkeit ändern
       if (target.classList.contains("toggle-visibility")) {
         const fileName = target.getAttribute("data-filename");
-        const isPublic = isFilePublic(fileName);
         
         try {
-          if (isPublic) {
-            // Mache privat
-            await toggleFileVisibility(fileName, false);
+          // Aktuelle Sichtbarkeit prüfen
+          const { data, error } = await supabaseClient
+            .from(visibilityTable)
+            .select('is_public')
+            .eq('filename', fileName)
+            .single();
+            
+          const currentlyPublic = data?.is_public || false;
+          
+          // Sichtbarkeit umschalten
+          await setFileVisibility(fileName, !currentlyPublic);
+          
+          // Erfolgsmeldung
+          if (currentlyPublic) {
             showSuccess(`Datei '${fileName}' wurde privat gemacht.`);
           } else {
-            // Mache öffentlich
-            await toggleFileVisibility(fileName, true);
             showSuccess(`Datei '${fileName}' wurde öffentlich gemacht.`);
           }
           
@@ -1323,66 +1456,51 @@
           loadFilesWithRetry();
           loadAdminFilesWithRetry();
         } catch (error) {
+          console.error("Fehler beim Ändern der Sichtbarkeit:", error);
           showError("Fehler beim Ändern der Sichtbarkeit: " + error.message);
         }
       }
     }
     
-    // --- Sichtbarkeit von Dateien umschalten ---
-    async function toggleFileVisibility(fileName, makePublic) {
+    // --- Sichtbarkeit einer Datei setzen ---
+    async function setFileVisibility(fileName, isPublic) {
       try {
-        // Hole die aktuelle Datei als Blob
-        const { data: fileData, error: fetchError } = await supabaseClient
-          .storage
-          .from('podcast-audio')
-          .download(fileName);
+        // Prüfen, ob ein Eintrag bereits existiert
+        const { data, error: checkError } = await supabaseClient
+          .from(visibilityTable)
+          .select('id')
+          .eq('filename', fileName)
+          .single();
           
-        if (fetchError) throw fetchError;
-        
-        // Bestimme neuen Dateinamen basierend auf der gewünschten Sichtbarkeit
-        const newFileName = makePublic 
-          ? makeFileNamePublic(fileName) 
-          : makeFileNamePrivate(fileName);
-          
-        // Wenn der Name gleich ist, muss nichts geändert werden
-        if (newFileName === fileName) {
-          return;
+        if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = No rows returned
+          console.warn("Fehler bei der Prüfung der Visibility:", checkError);
         }
         
-        // Lade die Datei mit dem neuen Namen hoch
-        const { error: uploadError } = await supabaseClient
-          .storage
-          .from('podcast-audio')
-          .upload(newFileName, fileData, { 
-            upsert: true,
-            contentType: fileData.type
-          });
-          
-        if (uploadError) throw uploadError;
-        
-        // Lösche die alte Datei
-        const { error: deleteError } = await supabaseClient
-          .storage
-          .from('podcast-audio')
-          .remove([fileName]);
-          
-        if (deleteError) throw deleteError;
-        
-        // Aktualisiere myUploads, wenn dies eine eigene Datei war
-        if (myUploads.includes(fileName)) {
-          // Entferne alten Namen
-          myUploads = myUploads.filter(name => name !== fileName);
-          // Füge neuen Namen hinzu
-          myUploads.push(newFileName);
-          // Speichere aktualisierte Liste
-          localStorage.setItem('myUploads', JSON.stringify(myUploads));
-          appSettings.myUploads = myUploads;
+        if (data) {
+          // Update bestehenden Eintrag
+          const { error: updateError } = await supabaseClient
+            .from(visibilityTable)
+            .update({ is_public: isPublic })
+            .eq('filename', fileName);
+            
+          if (updateError) {
+            throw updateError;
+          }
+        } else {
+          // Neuen Eintrag erstellen
+          const { error: insertError } = await supabaseClient
+            .from(visibilityTable)
+            .insert({ filename: fileName, is_public: isPublic });
+            
+          if (insertError) {
+            throw insertError;
+          }
         }
         
-        console.log(`Datei '${fileName}' wurde zu '${newFileName}' umbenannt.`);
+        console.log(`Datei '${fileName}' Sichtbarkeit auf ${isPublic ? 'öffentlich' : 'privat'} gesetzt.`);
         return true;
       } catch (error) {
-        console.error("Fehler beim Ändern der Sichtbarkeit:", error);
+        console.error("Fehler beim Setzen der Sichtbarkeit:", error);
         throw error;
       }
     }
