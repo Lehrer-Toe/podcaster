@@ -701,51 +701,36 @@
     const confirmLoginBtn   = document.getElementById("confirmLoginBtn");
     const cancelLoginBtn    = document.getElementById("cancelLoginBtn");
 
-// Funktion zum Laden der Dateien über den Supabase-Client
-function loadFilesByREST() {
-  fileList.innerHTML = "<li>Dateien werden geladen...</li>";
-  
-  // Supabase Client verwenden
-  supabaseClient.storage
-    .from('podcast-audio')
-    .list()
-    .then(response => {
-      if (response.error) {
-        throw response.error;
-      }
+    // Funktion zum Laden der Dateien über den Supabase-Client
+    function loadFilesByREST() {
+      fileList.innerHTML = "<li>Dateien werden geladen...</li>";
       
-      const files = response.data || [];
-      
-      if (!files || files.length === 0) {
-        fileList.innerHTML = "<li>Keine Aufnahmen vorhanden</li>";
-        return;
-      }
-      
-      fileList.innerHTML = "";
-      
-      // Zur Anzeige ausgewählte Dateien
-      const visibleFiles = files.filter(function(file) {
-        // Dateien anzeigen, die dem Benutzer gehören ODER öffentlich sind
-        const userOwnsFile = myUploads.includes(file.name);
-        
-        // Überprüfen Sie sowohl die Supabase-Metadaten als auch die lokale Liste
-        const isPublicInSupabase = file.metadata && file.metadata.isPublic === true;
-        const isPublicLocal = isFilePublic(file.name);
-        const isPublic = isPublicInSupabase || isPublicLocal;
-        
-        // Wenn die Datei in Supabase öffentlich ist, aber nicht in der lokalen Liste,
-        // fügen Sie sie der lokalen Liste hinzu
-        if (isPublicInSupabase && !isPublicLocal) {
-          setFilePublic(file.name, true);
-        }
-        
-        return userOwnsFile || isPublic;
-      });
-      
-      // Rest der Funktion bleibt unverändert...
-      // ...
-    });
-}
+      // Supabase Client verwenden
+      supabaseClient.storage
+        .from('podcast-audio')
+        .list()
+        .then(response => {
+          if (response.error) {
+            throw response.error;
+          }
+          
+          const files = response.data || [];
+          
+          if (!files || files.length === 0) {
+            fileList.innerHTML = "<li>Keine Aufnahmen vorhanden</li>";
+            return;
+          }
+          
+          fileList.innerHTML = "";
+          
+          // Zur Anzeige ausgewählte Dateien
+          const visibleFiles = files.filter(function(file) {
+            // Dateien anzeigen, die dem Benutzer gehören ODER öffentlich sind
+            const userOwnsFile = myUploads.includes(file.name);
+            const isPublic = isFilePublic(file.name);
+            
+            return userOwnsFile || isPublic;
+          });
           
           if (visibleFiles.length === 0) {
             fileList.innerHTML = "<li>Keine sichtbaren Aufnahmen vorhanden</li>";
@@ -1557,7 +1542,6 @@ function loadFilesByREST() {
     }
 
     // --- 17) Admin-Dateiaktionen mit echtem Löschen ---
-// --- 17) Admin-Dateiaktionen mit echtem Löschen und echter Sichtbarkeitsänderung ---
 function handleAdminFileAction(e) {
   const target = e.target;
   
@@ -1629,51 +1613,30 @@ function handleAdminFileAction(e) {
     target.textContent = "Wird aktualisiert...";
     target.disabled = true;
     
-    // Metadaten für die Datei in Supabase aktualisieren
-    const metadaten = { isPublic: makePublic };
+    // Sichtbarkeit aktualisieren (lokal)
+    setFilePublic(fileName, makePublic);
     
-    // Supabase-Metadaten aktualisieren
-    supabaseClient.storage
-      .from('podcast-audio')
-      .updateMetadata(fileName, metadaten)
-      .then(function(response) {
-        console.log("Metadaten-Update Antwort:", response);
-        
-        if (response.error) {
-          throw response.error;
-        }
-        
-        // Auch lokale Sichtbarkeit aktualisieren
-        setFilePublic(fileName, makePublic);
-        
-        // UI-Element direkt aktualisieren
-        const liElement = target.closest('li');
-        if (liElement) {
-          liElement.className = makePublic ? 'public-file' : 'private-file';
-          const iconElement = liElement.querySelector('.file-visibility-icon');
-          if (iconElement) {
-            iconElement.textContent = makePublic ? '👁️' : '🔒';
-          }
-        }
-        
-        // Button aktualisieren
-        target.textContent = makePublic ? 'Privat machen' : 'Öffentlich machen';
-        target.disabled = false;
-        
-        // Erfolgsmeldung
-        showSuccess(`Datei '${fileName}' ist jetzt ${makePublic ? 'öffentlich' : 'privat'}.`);
-        
-        // Hauptliste aktualisieren mit Verzögerung
-        setTimeout(function() {
-          loadFilesByREST();
-        }, 500);
-      })
-      .catch(function(err) {
-        console.error("Fehler beim Ändern der Sichtbarkeit:", err);
-        showError(`Fehler beim Ändern der Sichtbarkeit: ${err.message || "Unbekannter Fehler"}`);
-        target.textContent = makePublic ? "Öffentlich machen" : "Privat machen";
-        target.disabled = false;
-      });
+    // UI-Element direkt aktualisieren
+    const liElement = target.closest('li');
+    if (liElement) {
+      liElement.className = makePublic ? 'public-file' : 'private-file';
+      const iconElement = liElement.querySelector('.file-visibility-icon');
+      if (iconElement) {
+        iconElement.textContent = makePublic ? '👁️' : '🔒';
+      }
+    }
+    
+    // Button aktualisieren
+    target.textContent = makePublic ? 'Privat machen' : 'Öffentlich machen';
+    target.disabled = false;
+    
+    // Erfolgsmeldung
+    showSuccess(`Datei '${fileName}' ist jetzt ${makePublic ? 'öffentlich' : 'privat'}.`);
+    
+    // Hauptliste aktualisieren mit Verzögerung
+    setTimeout(function() {
+      loadFilesByREST();
+    }, 500);
   }
 }
     
