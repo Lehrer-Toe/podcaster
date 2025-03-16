@@ -1363,19 +1363,28 @@
           target.textContent = "Wird gelöscht...";
           target.disabled = true;
           
-          // Die Datei löschen mit direktem Zugriff und Cache-Busting
-          const cacheBuster = Date.now();
-          const { error: removeError } = await supabaseClient
-            .storage
-            .from('podcast-audio')
-            .remove([fileName], {
-              // @ts-ignore
-              cacheBuster: cacheBuster
-            });
+          // Direkte REST-API verwenden statt Supabase-Client
+          // URL für die Dateilöschung in Supabase Storage
+          const fileUrl = `${SUPABASE_URL}/storage/v1/object/podcast-audio/${encodeURIComponent(fileName)}`;
           
-          if (removeError) {
-            throw removeError;
+          // Direkter API-Aufruf mit Fetch
+          const response = await fetch(fileUrl, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache'
+            }
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(`HTTP Fehler ${response.status}: ${errorData.error || response.statusText}`);
           }
+          
+          // Überprüfen, ob die Datei wirklich gelöscht wurde
+          console.log(`Datei ${fileName} gelöscht. HTTP-Status: ${response.status}`);
           
           // Aus der öffentlichen Liste entfernen
           if (publicFiles.includes(fileName)) {
@@ -1397,14 +1406,12 @@
           
           showSuccess(`Datei '${fileName}' wurde gelöscht.`);
           
-          // Dateiliste aktualisieren nach kurzer Verzögerung (für Server-Synchronisierung)
-          setTimeout(async () => {
-            await loadFiles();
-            // Prüfe, ob die Liste leer ist
-            if (adminFileList.children.length === 0) {
-              adminFileList.innerHTML = "<li>Keine Aufnahmen vorhanden</li>";
-            }
-          }, 1000);
+          // Verzögerung, um dem Server Zeit zu geben
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Dateilisten aktualisieren
+          await loadFiles();
+          await loadAdminFiles();
         } catch (err) {
           console.error("Fehler beim Löschen:", err);
           showError(`Fehler beim Löschen: ${err.message || "Unbekannter Fehler"}`);
