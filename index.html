@@ -701,6 +701,153 @@
     const confirmLoginBtn   = document.getElementById("confirmLoginBtn");
     const cancelLoginBtn    = document.getElementById("cancelLoginBtn");
 
+    // Funktion zum Laden der Dateien über direkte REST-API
+    function loadFilesByREST() {
+      fileList.innerHTML = "<li>Dateien werden geladen...</li>";
+      
+      // Cache-Busting Parameter hinzufügen
+      const cacheBuster = Date.now();
+      const url = `${SUPABASE_URL}/storage/v1/bucket/podcast-audio/list?limit=100&sortBy=created_at&sortOrder=desc`;
+      
+      fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP-Status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        const files = data || [];
+        
+        if (!files || files.length === 0) {
+          fileList.innerHTML = "<li>Keine Aufnahmen vorhanden</li>";
+          return;
+        }
+        
+        fileList.innerHTML = "";
+        
+        // Zur Anzeige ausgewählte Dateien
+        const visibleFiles = files.filter(function(file) {
+          // Dateien anzeigen, die dem Benutzer gehören ODER öffentlich sind
+          const userOwnsFile = myUploads.includes(file.name);
+          const isPublic = isFilePublic(file.name);
+          
+          return userOwnsFile || isPublic;
+        });
+        
+        if (visibleFiles.length === 0) {
+          fileList.innerHTML = "<li>Keine sichtbaren Aufnahmen vorhanden</li>";
+          return;
+        }
+        
+        // Liste erstellen
+        for (const file of visibleFiles) {
+          const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/podcast-audio/${encodeURIComponent(file.name)}`;
+          
+          // Cache-Busting Parameter zum URL hinzufügen
+          const noCacheUrl = publicUrl + (publicUrl.includes('?') ? '&' : '?') + '_cb=' + cacheBuster;
+          
+          const isPublic = isFilePublic(file.name);
+          const isOwner = myUploads.includes(file.name);
+          
+          const li = document.createElement('li');
+          if (isPublic) {
+            li.className = 'public-file';
+          }
+          
+          li.innerHTML = `
+            <a href="${noCacheUrl}" target="_blank" download="${file.name}">
+              ${file.name}
+            </a>
+            <span class="file-size">(${formatBytes(file.metadata?.size || 0)})</span>
+            ${isPublic ? '<span class="file-visibility-icon">👁️</span>' : ''}
+            ${isOwner ? ' (Meine Datei)' : ''}
+          `;
+          
+          fileList.appendChild(li);
+        }
+      })
+      .catch(function(err) {
+        console.error("Fehler beim Laden der Dateien:", err);
+        fileList.innerHTML = "<li class='error-message'>Fehler beim Laden der Dateien</li>";
+      });
+    }
+
+    // Funktion zum Laden der Admin-Dateien über direkte REST-API
+    function loadAdminFilesByREST() {
+      adminFileList.innerHTML = "<li>Dateien werden geladen...</li>";
+      
+      // Cache-Busting Parameter hinzufügen
+      const cacheBuster = Date.now();
+      const url = `${SUPABASE_URL}/storage/v1/bucket/podcast-audio/list?limit=100&sortBy=created_at&sortOrder=desc`;
+      
+      fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP-Status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        const files = data || [];
+        
+        if (!files || files.length === 0) {
+          adminFileList.innerHTML = "<li>Keine Aufnahmen vorhanden</li>";
+          return;
+        }
+        
+        adminFileList.innerHTML = "";
+        
+        // Admin-Liste erstellen
+        for (const file of files) {
+          const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/podcast-audio/${encodeURIComponent(file.name)}`;
+          
+          // Cache-Busting Parameter zum URL hinzufügen
+          const noCacheUrl = publicUrl + (publicUrl.includes('?') ? '&' : '?') + '_cb=' + cacheBuster;
+          
+          const isPublic = isFilePublic(file.name);
+          
+          const li = document.createElement('li');
+          li.className = isPublic ? 'public-file' : 'private-file';
+          li.dataset.filename = file.name;
+          
+          li.innerHTML = `
+            <a href="${noCacheUrl}" target="_blank">${file.name}</a>
+            <span class="file-size">(${formatBytes(file.metadata?.size || 0)})</span>
+            <span class="file-visibility">
+              <span class="file-visibility-icon">${isPublic ? '👁️' : '🔒'}</span>
+            </span>
+            <button class="toggle-visibility" data-filename="${file.name}">
+              ${isPublic ? 'Privat machen' : 'Öffentlich machen'}
+            </button>
+            <button class="delete" data-filename="${file.name}">Löschen</button>
+          `;
+          
+          adminFileList.appendChild(li);
+        }
+      })
+      .catch(function(err) {
+        console.error("Fehler beim Laden der Admin-Dateien:", err);
+        adminFileList.innerHTML = "<li class='error-message'>Fehler beim Laden der Dateien</li>";
+      });
+    }
+
     // --- 4) Initialisierung ---
     function init() {
       // Debug-Info für bessere Fehlerbehebung
