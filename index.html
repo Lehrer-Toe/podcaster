@@ -467,7 +467,7 @@
 <body>
   <header>
     <h1>Podcast Aufnahme</h1>
-    <div class="version">v2.0</div>
+    <div class="version">v2.1</div>
   </header>
 
   <div class="container">
@@ -595,18 +595,39 @@
     const SUPABASE_URL = "https://qzmzlrsfuepbkqwzbrir.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6bXpscnNmdWVwYmtxd3picmlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE5NTkxMzAsImV4cCI6MjA1NzUzNTEzMH0.zLZDSfylloUxlxYPEpfO4VMAdf0cNpUzKH2T9qv8ezI";
     
-    // Initialisiere Supabase Client
+    // Initialisiere Supabase Client - nur EINMAL für die gesamte App
     let supabaseClient;
     try {
+      // Erstelle den Client mit deaktiviertem Caching
       supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         auth: {
-          persistSession: false // Keine Session speichern
+          persistSession: false,
+          autoRefreshToken: false
+        },
+        global: {
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
         }
       });
       console.log("Supabase Client erfolgreich initialisiert");
     } catch (err) {
       console.error("Fehler bei der Supabase-Initialisierung:", err);
       showError("Verbindungsfehler: Bitte später erneut versuchen.");
+    }
+    
+    // Funktion zum Aktualisieren der Dateilisten
+    function refreshFileList() {
+      // Cache leeren
+      clearLocalCache();
+      
+      // Dateilisten neu laden ohne neuen Client zu erstellen
+      loadFiles();
+      
+      // Admin-Dateien neu laden, falls im Admin-Bereich
+      if (appSettings.adminLoggedIn) {
+        loadAdminFiles();
+      }
     }
 
     // --- 2) Variablen ---
@@ -901,6 +922,7 @@
       passwordModal.style.display = "none";
     }
     
+    // Funktion zum Aktualisieren der Dateilisten
     // --- 7.3) Lokalen Speicher vollständig löschen ---
     function clearAllLocalStorage() {
       if (confirm("Möchten Sie wirklich den gesamten lokalen Speicher löschen? Dies entfernt alle gespeicherten Aufnahmen und Einstellungen.")) {
@@ -1211,6 +1233,9 @@
     function loadFiles() {
       fileList.innerHTML = "<li>Dateien werden geladen...</li>";
       
+      // Cache-Busting Parameter hinzufügen
+      const cacheBuster = Date.now();
+      
       supabaseClient.storage
         .from('podcast-audio')
         .list('', { 
@@ -1253,6 +1278,9 @@
               .from('podcast-audio')
               .getPublicUrl(file.name).data.publicUrl;
             
+            // Cache-Busting Parameter zum URL hinzufügen
+            const noCacheUrl = publicUrl + (publicUrl.includes('?') ? '&' : '?') + '_cb=' + cacheBuster;
+            
             const isPublic = isFilePublic(file.name);
             const isOwner = myUploads.includes(file.name);
             
@@ -1262,7 +1290,7 @@
             }
             
             li.innerHTML = `
-              <a href="${publicUrl}" target="_blank" download="${file.name}">
+              <a href="${noCacheUrl}" target="_blank" download="${file.name}">
                 ${file.name}
               </a>
               <span class="file-size">(${formatBytes(file.metadata?.size || 0)})</span>
@@ -1301,6 +1329,9 @@
     function loadAdminFiles() {
       adminFileList.innerHTML = "<li>Dateien werden geladen...</li>";
       
+      // Cache-Busting Parameter hinzufügen
+      const cacheBuster = Date.now();
+      
       supabaseClient.storage
         .from('podcast-audio')
         .list('', { 
@@ -1330,6 +1361,9 @@
               .from('podcast-audio')
               .getPublicUrl(file.name).data.publicUrl;
             
+            // Cache-Busting Parameter zum URL hinzufügen
+            const noCacheUrl = publicUrl + (publicUrl.includes('?') ? '&' : '?') + '_cb=' + cacheBuster;
+            
             const isPublic = isFilePublic(file.name);
             
             const li = document.createElement('li');
@@ -1337,7 +1371,7 @@
             li.dataset.filename = file.name;
             
             li.innerHTML = `
-              <a href="${publicUrl}" target="_blank">${file.name}</a>
+              <a href="${noCacheUrl}" target="_blank">${file.name}</a>
               <span class="file-size">(${formatBytes(file.metadata?.size || 0)})</span>
               <span class="file-visibility">
                 <span class="file-visibility-icon">${isPublic ? '👁️' : '🔒'}</span>
