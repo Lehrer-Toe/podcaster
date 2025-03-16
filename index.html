@@ -1541,24 +1541,34 @@
         });
     }
 
-    // --- 17) Admin-Dateiaktionen mit lokaler Löschung---
-    function handleAdminFileAction(e) {
-      const target = e.target;
-      
-      // Datei löschen
-      if (target.classList.contains("delete")) {
-        const fileName = target.getAttribute("data-filename");
+    // --- 17) Admin-Dateiaktionen mit echtem Löschen ---
+function handleAdminFileAction(e) {
+  const target = e.target;
+  
+  // Datei löschen
+  if (target.classList.contains("delete")) {
+    const fileName = target.getAttribute("data-filename");
+    
+    if (!confirm(`Sind Sie sicher, dass Sie die Datei "${fileName}" löschen möchten?`)) {
+      return;
+    }
+    
+    // Anzeigen, dass die Löschung läuft
+    target.textContent = "Wird gelöscht...";
+    target.disabled = true;
+    
+    // ECHTES LÖSCHEN mit Supabase Client
+    console.log("Beginne echte Löschung für Datei:", fileName);
+    
+    supabaseClient.storage
+      .from('podcast-audio')
+      .remove([fileName])
+      .then(function(response) {
+        console.log("Löschvorgang Antwort:", response);
         
-        if (!confirm(`Sind Sie sicher, dass Sie die Datei "${fileName}" löschen möchten?`)) {
-          return;
+        if (response.error) {
+          throw response.error;
         }
-        
-        // Anzeigen, dass die Löschung läuft
-        target.textContent = "Wird gelöscht...";
-        target.disabled = true;
-        
-        // VARIANTE 2: Simuliere erfolgreiche Löschung in der UI
-        console.log("Simuliere Löschung für Datei:", fileName);
         
         // Aus der öffentlichen Liste entfernen
         if (publicFiles.includes(fileName)) {
@@ -1585,43 +1595,50 @@
           loadFilesByREST();
           loadAdminFilesByREST();
         }, 1000);
-      }
-      
-      // Sichtbarkeit ändern
-      if (target.classList.contains("toggle-visibility")) {
-        const fileName = target.getAttribute("data-filename");
-        const makePublic = target.textContent.includes("Öffentlich machen");
-        
-        // Button-Status aktualisieren
-        target.textContent = "Wird aktualisiert...";
-        target.disabled = true;
-        
-        // Sichtbarkeit aktualisieren (lokal)
-        setFilePublic(fileName, makePublic);
-        
-        // UI-Element direkt aktualisieren
-        const liElement = target.closest('li');
-        if (liElement) {
-          liElement.className = makePublic ? 'public-file' : 'private-file';
-          const iconElement = liElement.querySelector('.file-visibility-icon');
-          if (iconElement) {
-            iconElement.textContent = makePublic ? '👁️' : '🔒';
-          }
-        }
-        
-        // Button aktualisieren
-        target.textContent = makePublic ? 'Privat machen' : 'Öffentlich machen';
+      })
+      .catch(function(err) {
+        console.error("Fehler beim Löschen:", err);
+        showError(`Fehler beim Löschen: ${err.message || "Unbekannter Fehler"}`);
+        target.textContent = "Löschen";
         target.disabled = false;
-        
-        // Erfolgsmeldung
-        showSuccess(`Datei '${fileName}' ist jetzt ${makePublic ? 'öffentlich' : 'privat'}.`);
-        
-        // Hauptliste aktualisieren mit Verzögerung
-        setTimeout(function() {
-          loadFilesByREST();
-        }, 500);
+      });
+  }
+  
+  // Sichtbarkeit ändern
+  if (target.classList.contains("toggle-visibility")) {
+    const fileName = target.getAttribute("data-filename");
+    const makePublic = target.textContent.includes("Öffentlich machen");
+    
+    // Button-Status aktualisieren
+    target.textContent = "Wird aktualisiert...";
+    target.disabled = true;
+    
+    // Sichtbarkeit aktualisieren (lokal)
+    setFilePublic(fileName, makePublic);
+    
+    // UI-Element direkt aktualisieren
+    const liElement = target.closest('li');
+    if (liElement) {
+      liElement.className = makePublic ? 'public-file' : 'private-file';
+      const iconElement = liElement.querySelector('.file-visibility-icon');
+      if (iconElement) {
+        iconElement.textContent = makePublic ? '👁️' : '🔒';
       }
     }
+    
+    // Button aktualisieren
+    target.textContent = makePublic ? 'Privat machen' : 'Öffentlich machen';
+    target.disabled = false;
+    
+    // Erfolgsmeldung
+    showSuccess(`Datei '${fileName}' ist jetzt ${makePublic ? 'öffentlich' : 'privat'}.`);
+    
+    // Hauptliste aktualisieren mit Verzögerung
+    setTimeout(function() {
+      loadFilesByREST();
+    }, 500);
+  }
+}
     
     // --- 18) Alles herunterladen (ZIP) ---
     function downloadAllFiles() {
