@@ -467,7 +467,7 @@
 <body>
   <header>
     <h1>Podcast Aufnahme</h1>
-    <div class="version">v2.1</div>
+    <div class="version">v2.2</div>
   </header>
 
   <div class="container">
@@ -598,18 +598,26 @@
     // Initialisiere Supabase Client - nur EINMAL für die gesamte App
     let supabaseClient;
     try {
-      // Erstelle den Client mit deaktiviertem Caching
-      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      // Erstelle den Client mit deaktiviertem Caching und Auth
+      const options = {
+        db: {
+          schema: 'public'
+        },
         auth: {
+          autoRefreshToken: false,
           persistSession: false,
-          autoRefreshToken: false
+          detectSessionInUrl: false
         },
         global: {
           headers: {
-            'Cache-Control': 'no-cache'
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
           }
         }
-      });
+      };
+      
+      // Erstelle den Client nur einmal
+      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, options);
       console.log("Supabase Client erfolgreich initialisiert");
     } catch (err) {
       console.error("Fehler bei der Supabase-Initialisierung:", err);
@@ -722,8 +730,8 @@
       // Prüfe, ob es eine gespeicherte Aufnahme gibt
       checkForSavedRecording();
       
-      // Lade vorhandene Dateien
-      loadFiles();
+      // Lade vorhandene Dateien mit direkter REST-API
+      loadFilesByREST();
     }
 
     // --- Function: Cache löschen ---
@@ -1198,7 +1206,8 @@
         .from('podcast-audio')
         .upload(fileName, currentRecordingBlob, { 
           contentType: mimeType,
-          upsert: true // Überschreiben falls Datei existiert
+          upsert: true, // Überschreiben falls Datei existiert
+          cacheControl: '0' // Vermeidet Caching
         })
         .then(function(response) {
           if (response.error) {
@@ -1220,7 +1229,7 @@
           clearSavedRecording();
           
           // Dateiliste aktualisieren
-          loadFiles();
+          refreshFileList();
         })
         .catch(function(error) {
           console.error("Upload-Fehler:", error);
@@ -1322,7 +1331,7 @@
     function showAdminPanel() {
       adminPanel.style.display = "block";
       appSettings.adminLoggedIn = true;
-      loadAdminFiles();
+      loadAdminFilesByREST();
     }
 
     // --- 16) Admin-Dateien laden ---
@@ -1407,52 +1416,67 @@
         target.textContent = "Wird gelöscht...";
         target.disabled = true;
         
-        // Löschen mit Supabase
-        supabaseClient.storage
-          .from('podcast-audio')
-          .remove([fileName])
-          .then(function(response) {
-            if (response.error) {
-              throw response.error;
+        // Direkte REST-API verwenden statt Supabase-Client
+        const encodedFileName = encodeURIComponent(fileName);
+        const url = `${SUPABASE_URL}/storage/v1/object/podcast-audio/${encodedFileName}`;
+        
+        // HTTP-DELETE direkt mit fetch
+        fetch(url, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          }
+        })
+        .then(function(response) {
+          if (!response.ok) {
+            if (response.status === 404) {
+              console.log("Datei wurde nicht gefunden (404), könnte bereits gelöscht sein");
+              // Trotzdem als Erfolg behandeln
+              return { success: true };
             }
-            
-            console.log("Datei erfolgreich gelöscht:", fileName);
-            
-            // Aus der öffentlichen Liste entfernen
-            if (publicFiles.includes(fileName)) {
-              setFilePublic(fileName, false);
-            }
-            
-            // Entferne aus myUploads
-            if (myUploads.includes(fileName)) {
-              myUploads = myUploads.filter(name => name !== fileName);
-              localStorage.setItem('myUploads', JSON.stringify(myUploads));
-              appSettings.myUploads = myUploads;
-            }
-            
-            // Entferne das Element direkt aus der DOM
-            const liElement = adminFileList.querySelector(`li[data-filename="${fileName}"]`);
-            if (liElement) {
-              liElement.remove();
-            }
-            
-            showSuccess(`Datei '${fileName}' wurde gelöscht.`);
-            
-            // Dateilisten aktualisieren nach kurzer Verzögerung
-            setTimeout(function() {
-              loadFiles();
-              // Supabase neu initialisieren, um sicherzustellen, dass keine gecachten Daten verwendet werden
-              supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-                auth: { persistSession: false }
-              });
-            }, 1000);
-          })
-          .catch(function(err) {
-            console.error("Fehler beim Löschen:", err);
-            showError(`Fehler beim Löschen: ${err.message || "Unbekannter Fehler"}`);
-            target.textContent = "Löschen";
-            target.disabled = false;
-          });
+            throw new Error(`HTTP-Status: ${response.status}`);
+          }
+          return { success: true };
+        })
+        .then(function() {
+          console.log("Datei erfolgreich gelöscht:", fileName);
+          
+          // Aus der öffentlichen Liste entfernen
+          if (publicFiles.includes(fileName)) {
+            setFilePublic(fileName, false);
+          }
+          
+          // Entferne aus myUploads
+          if (myUploads.includes(fileName)) {
+            myUploads = myUploads.filter(name => name !== fileName);
+            localStorage.setItem('myUploads', JSON.stringify(myUploads));
+            appSettings.myUploads = myUploads;
+          }
+          
+          // Entferne das Element direkt aus der DOM
+          const liElement = adminFileList.querySelector(`li[data-filename="${fileName}"]`);
+          if (liElement) {
+            liElement.remove();
+          }
+          
+          showSuccess(`Datei '${fileName}' wurde gelöscht.`);
+          
+          // Dateilisten aktualisieren nach kurzer Verzögerung
+          setTimeout(function() {
+            // Direkt die Listen neu laden ohne Supabase-Client
+            loadFilesByREST();
+            loadAdminFilesByREST();
+          }, 1000);
+        })
+        .catch(function(err) {
+          console.error("Fehler beim Löschen:", err);
+          showError(`Fehler beim Löschen: ${err.message || "Unbekannter Fehler"}`);
+          target.textContent = "Löschen";
+          target.disabled = false;
+        });
       }
       
       // Sichtbarkeit ändern
@@ -1484,8 +1508,10 @@
         // Erfolgsmeldung
         showSuccess(`Datei '${fileName}' ist jetzt ${makePublic ? 'öffentlich' : 'privat'}.`);
         
-        // Hauptliste aktualisieren
-        loadFiles();
+        // Hauptliste aktualisieren mit Verzögerung
+        setTimeout(function() {
+          loadFilesByREST();
+        }, 500);
       }
     }
     
