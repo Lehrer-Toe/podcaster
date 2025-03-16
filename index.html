@@ -707,7 +707,7 @@
       
       // Cache-Busting Parameter hinzufügen
       const cacheBuster = Date.now();
-      const url = `${SUPABASE_URL}/storage/v1/bucket/podcast-audio/list?limit=100&sortBy=created_at&sortOrder=desc`;
+      const url = `${SUPABASE_URL}/storage/v1/object/list/podcast-audio`;
       
       fetch(url, {
         method: 'GET',
@@ -787,7 +787,7 @@
       
       // Cache-Busting Parameter hinzufügen
       const cacheBuster = Date.now();
-      const url = `${SUPABASE_URL}/storage/v1/bucket/podcast-audio/list?limit=100&sortBy=created_at&sortOrder=desc`;
+      const url = `${SUPABASE_URL}/storage/v1/object/list/podcast-audio`;
       
       fetch(url, {
         method: 'GET',
