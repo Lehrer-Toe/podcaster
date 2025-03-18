@@ -475,7 +475,7 @@
     <div class="record-controls">
       <div class="filename-input-container">
         <label for="filename" class="input-label">Dateiname (Pflicht)</label>
-        <input type="text" id="filename" placeholder="Bitte Dateinamen eingeben" />
+        <input type="text" id="filename" placeholder="Bitte Dateinamen eingeben" autocomplete="off" />
       </div>
 
       <!-- Audio-Format Info -->
@@ -654,6 +654,11 @@
     let recordingInterval = null;
     let isPaused = false;
     let isRecording = false;
+    
+    // Variable für den Audio-Verstärker (GainNode)
+    let gainNode;
+    // Standard-Verstärkungsfaktor (1.5x)
+    const GAIN_VALUE = 1.5;
     
     // Eigene Uploads speichern
     let myUploads = [];
@@ -1063,6 +1068,10 @@
       // Dateiname-Validierung
       filenameInput.addEventListener("input", validateFileName);
       
+      // ÄNDERUNG: Bei Klick auf das Eingabefeld den Text leeren
+      filenameInput.addEventListener("click", clearFilenameInput);
+      filenameInput.addEventListener("focus", clearFilenameInput);
+      
       // Aufnahme-Steuerung
       startBtn.addEventListener("click", startRecording);
       pauseBtn.addEventListener("click", pauseRecording);
@@ -1110,6 +1119,12 @@
       if (appSettings.isIOS) {
         document.addEventListener('touchstart', function(){}, {passive: true});
       }
+    }
+    
+    // NEUE FUNKTION: Leeren des Dateiname-Eingabefelds beim Klicken/Fokussieren
+    function clearFilenameInput() {
+      filenameInput.value = "";
+      validateFileName();
     }
 
     // --- 7) Dateiname-Validierung ---
@@ -1222,6 +1237,24 @@
         .then(function(stream) {
           audioStream = stream;
           
+          // ÄNDERUNG: AudioContext und GainNode für 1,5-fache Verstärkung erstellen
+          audioContext = new AudioContext();
+          const source = audioContext.createMediaStreamSource(stream);
+          
+          // GainNode für die Verstärkung erstellen
+          gainNode = audioContext.createGain();
+          gainNode.gain.value = GAIN_VALUE; // Verstärkung um Faktor 1.5
+          
+          // Verbindung herstellen: Quelle -> Verstärker
+          source.connect(gainNode);
+          
+          // Destination für MediaRecorder
+          const destination = audioContext.createMediaStreamDestination();
+          gainNode.connect(destination);
+          
+          // WICHTIG: Der verstärkte Stream für den MediaRecorder
+          const amplifiedStream = destination.stream;
+          
           // MediaRecorder initialisieren
           let recorderOptions = {};
           
@@ -1234,11 +1267,12 @@
           }
           
           try {
-            mediaRecorder = new MediaRecorder(audioStream, recorderOptions);
+            // ÄNDERUNG: Verstärkten Stream für die Aufnahme verwenden
+            mediaRecorder = new MediaRecorder(amplifiedStream, recorderOptions);
           } catch (formatError) {
             console.error("Format wird nicht unterstützt:", formatError);
             console.log("Versuche ohne mimeType-Angabe...");
-            mediaRecorder = new MediaRecorder(audioStream);
+            mediaRecorder = new MediaRecorder(amplifiedStream);
             
             // Update formatInfo-Anzeige
             currentFormat.textContent = "Standard (geräteabhängig)";
@@ -1270,8 +1304,8 @@
           // UI aktualisieren
           updateRecordingUI(true);
           
-          // Visualizer und Timer starten
-          startVisualizer(audioStream);
+          // ÄNDERUNG: Für den Visualizer den ursprünglichen Stream verwenden (ohne Verstärkung)
+          startVisualizer(stream);
           startTimer();
           
           showMessage("Aufnahme läuft...", true);
@@ -1346,6 +1380,11 @@
           stopTimer();
           stopVisualizer();
           updateRecordingUI(false);
+          
+          // ÄNDERUNG: AudioContext und GainNode schließen
+          if (audioContext) {
+            audioContext.close().catch(err => console.warn("Fehler beim Schließen des AudioContext:", err));
+          }
         } catch (error) {
           console.error("Fehler beim Stoppen der Aufnahme:", error);
           showError("Fehler beim Stoppen der Aufnahme. Bitte laden Sie die Seite neu.");
@@ -1361,6 +1400,11 @@
             audioStream.getTracks().forEach(function(track) {
               track.stop();
             });
+          }
+          
+          // ÄNDERUNG: AudioContext und GainNode schließen im Fehlerfall
+          if (audioContext) {
+            audioContext.close().catch(err => console.warn("Fehler beim Schließen des AudioContext:", err));
           }
         }
       }
@@ -1651,8 +1695,11 @@
     // --- 16) Visualizer Funktionen ---
     function startVisualizer(stream) {
       try {
-        // AudioContext erstellen
-        audioContext = new AudioContext();
+        // ÄNDERUNG: Wenn audioContext bereits über startRecording initialisiert wurde, erstelle keinen neuen
+        if (!audioContext) {
+          audioContext = new AudioContext();
+        }
+        
         const source = audioContext.createMediaStreamSource(stream);
         analyser = audioContext.createAnalyser();
         analyser.fftSize = 1024;
@@ -1712,14 +1759,7 @@
         animationId = null;
       }
       
-      if (audioContext) {
-        try {
-          audioContext.close();
-        } catch (e) {
-          console.warn("Fehler beim Schließen des AudioContext:", e);
-        }
-        audioContext = null;
-      }
+      // Audiocontext wird nun im stopRecording geschlossen
       
       // Kreisgröße zurücksetzen
       visualizerCircle.style.width = "40px";
