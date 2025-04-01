@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Podcast Aufnahme</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="recorder-styles.css">
+  
+  <!-- JSZip & FileSaver für „Alles herunterladen" -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+  <!-- Supabase von CDN direkt einbinden -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <header>
+    <h1>Podcast Aufnahme</h1>
+    <div class="version">v4.0</div>
+  </header>
+
+  <div class="container">
+    <div class="teacher-info">
+      <button id="backToTeacherSelection" class="back-button">Zur Lehrerauswahl</button>
+      <div id="teacherInfoDisplay">
+        <!-- Lehrer-Info wird per JavaScript eingefügt -->
+      </div>
+    </div>
+
+    <!-- Aufnahme-Steuerung -->
+    <div class="record-controls">
+      <div class="filename-input-container">
+        <label for="filename" class="input-label">Schülername (Pflicht)</label>
+        <input type="text" id="filename" placeholder="Schülername eingeben" autocomplete="off" />
+      </div>
+
+      <!-- Audio-Format Info -->
+      <div class="format-info" id="formatInfo">
+        Aktuelles Format: <span id="currentFormat">Wird ermittelt...</span>
+      </div>
+
+      <!-- Erste Zeile mit Start und Stopp Buttons -->
+      <div class="button-row">
+        <button id="startBtn">Aufnahme starten</button>
+        <button id="stopBtn" disabled>Stoppen</button>
+      </div>
+      
+      <!-- Zweite Zeile mit Pause und Fortsetzen Buttons -->
+      <div class="button-row">
+        <button id="pauseBtn" disabled>Pausieren</button>
+        <button id="resumeBtn" disabled>Fortsetzen</button>
+      </div>
+      
+      <!-- Dritte Zeile mit Upload Button -->
+      <button id="uploadBtn" disabled>Hochladen</button>
+      
+      <!-- Vierte Zeile mit Speicher löschen Button -->
+      <button id="clearStorageBtn">Lokalen Speicher löschen</button>
+    </div>
+
+    <!-- Status-Anzeige -->
+    <div class="status-bar">
+      <span id="recordingStatus"></span>
+    </div>
+
+    <!-- Timer-Anzeige -->
+    <div id="timerDisplay">00:00</div>
+
+    <!-- Visueller Lautstärke-Indikator -->
+    <div class="visualizer-container">
+      <div class="visualizer-circle" id="visualizerCircle"></div>
+    </div>
+
+    <!-- Audio-Vorschau & Status -->
+    <audio id="audioPlayer" controls></audio>
+    <p id="uploadStatus"></p>
+
+    <!-- Tab-Navigation -->
+    <div class="tab-container">
+      <div class="tab-buttons">
+        <button class="tab-button active" data-tab="recordings">Aufnahmen</button>
+        <button class="tab-button" data-tab="help">Hilfe</button>
+      </div>
+      
+      <!-- Aufnahmen Tab -->
+      <div class="tab-content active" id="recordings-tab">
+        <!-- Öffentliche Dateiliste -->
+        <div class="file-list">
+          <h2>Vorhandene Aufnahmen</h2>
+          <ul id="fileList"></ul>
+        </div>
+      </div>
+      
+      <!-- Hilfe Tab -->
+      <div class="tab-content" id="help-tab">
+        <h2>Verwendung</h2>
+        <ol>
+          <li>Geben Sie Ihren Schülername ein</li>
+          <li>Klicken Sie auf "Aufnahme starten"</li>
+          <li>Sie können die Aufnahme pausieren und fortsetzen</li>
+          <li>Nach dem Stoppen können Sie die Aufnahme anhören</li>
+          <li>Klicken Sie auf "Hochladen", um die Aufnahme zu speichern</li>
+        </ol>
+        <p><strong>Hinweis:</strong> Ihr Browser speichert die letzte Aufnahme lokal. Sie können den lokalen Speicher mit dem "Lokalen Speicher löschen"-Button leeren.</p>
+        
+        <h3>Fehlerbehebung</h3>
+        <ul>
+          <li><strong>Mikrofon funktioniert nicht:</strong> Prüfen Sie die Browsereinstellungen und erteilen Sie die Berechtigung für den Mikrofonzugriff.</li>
+          <li><strong>Aufnahme startet nicht:</strong> Stellen Sie sicher, dass ein Dateiname eingegeben wurde.</li>
+          <li><strong>Probleme auf iOS:</strong> Starten Sie Safari neu oder verwenden Sie den Privatmodus, falls Sie Probleme haben.</li>
+          <li><strong>Hochladen funktioniert nicht:</strong> Möglicherweise ist die Verbindung zum Server unterbrochen. Versuchen Sie es später erneut.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Admin-Oberfläche -->
+    <div class="admin-panel" id="adminPanel">
+      <h2>Admin-Oberfläche</h2>
+      
+      <div class="admin-controls">
+        <button id="downloadAllBtn" style="background: #795548;">Alles herunterladen</button>
+        <button id="refreshAdminBtn" style="background: #009688;">Aktualisieren</button>
+      </div>
+      
+      <p>Hinweis: Klicken Sie auf den "Öffentlich/Privat"-Button, um die Sichtbarkeit einer Datei zu ändern.</p>
+      
+      <ul id="adminFileList"></ul>
+      <button id="closeAdminBtn">Admin schließen</button>
+    </div>
+
+    <!-- Admin-Login Button -->
+    <button id="adminLoginBtn">Admin Login</button>
+
+    <!-- Password Modal -->
+    <div id="passwordModal" class="modal">
+      <div class="modal-content">
+        <h3 class="modal-title">Admin Login</h3>
+        <p>Bitte geben Sie das Admin-Passwort ein:</p>
+        <input type="password" id="adminPasswordInput" placeholder="Passwort">
+        <div class="modal-footer">
+          <button id="cancelLoginBtn" style="background-color: #f44336;">Abbrechen</button>
+          <button id="confirmLoginBtn" style="background-color: #4CAF50;">Anmelden</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="podcast-app.js"></script>
+</body>
+</html>
