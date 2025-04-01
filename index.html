@@ -175,6 +175,7 @@
     
     /* --- Audio Format Info --- */
     .format-info {
+      display: none; /* Format-Info verstecken, da für Schüler nicht relevant */
       background-color: #f0f8e6;
       border-radius: 8px;
       padding: 10px 15px;
@@ -657,8 +658,8 @@
     
     // Variable für den Audio-Verstärker (GainNode)
     let gainNode;
-    // Standard-Verstärkungsfaktor (1.5x)
-    const GAIN_VALUE = 1.5;
+    // Standard-Verstärkungsfaktor (1.25x = 25% lauter)
+    const GAIN_VALUE = 1.25;
     
     // Eigene Uploads speichern
     let myUploads = [];
@@ -876,6 +877,9 @@
       // Cache löschen beim Start
       clearLocalCache();
       
+      // Lokalen Aufnahmespeicher löschen - für Datenschutz bei jedem Neuladen
+      clearSavedRecording();
+      
       // Lade gespeicherte Einstellungen aus dem LocalStorage
       if (appSettings.lastFileName) {
         filenameInput.value = appSettings.lastFileName;
@@ -931,14 +935,31 @@
     // --- Datei-Sichtbarkeit ändern (durch Umbenennen) ---
     async function setFilePublic(fileName, isPublic) {
       try {
-        // Wenn die Datei bereits den korrekten Status hat, nichts tun
+        // Check current status
         const currentlyPublic = isFilePublic(fileName);
+        
+        // Already in desired state
         if (currentlyPublic === isPublic) {
           console.log(`Datei ${fileName} ist bereits ${isPublic ? 'öffentlich' : 'privat'}`);
           return true;
         }
         
-        // Hole die aktuelle Datei
+        // Determine new filename
+        let newFileName;
+        if (isPublic && !currentlyPublic) {
+          // Make public: Add prefix
+          newFileName = PUBLIC_PREFIX + fileName;
+        } else if (!isPublic && currentlyPublic) {
+          // Make private: Remove prefix
+          newFileName = fileName.substring(PUBLIC_PREFIX.length);
+        } else {
+          // No change needed (should not happen)
+          return true;
+        }
+        
+        console.log(`Ändere Datei von ${fileName} zu ${newFileName}`);
+        
+        // Download current file
         const { data: fileData, error: fileError } = await supabaseClient.storage
           .from('podcast-audio')
           .download(fileName);
@@ -948,21 +969,11 @@
           throw fileError;
         }
         
-        // Bestimme den neuen Dateinamen
-        let newFileName;
-        if (isPublic) {
-          // Privat -> Öffentlich: Füge Prefix hinzu
-          newFileName = PUBLIC_PREFIX + fileName;
-        } else {
-          // Öffentlich -> Privat: Entferne Prefix
-          newFileName = fileName.substring(PUBLIC_PREFIX.length);
-        }
-        
-        // Lade die Datei mit neuem Namen hoch
+        // Upload with new name
         const { error: uploadError } = await supabaseClient.storage
           .from('podcast-audio')
           .upload(newFileName, fileData, {
-            contentType: 'audio/mp4', // Standardwert, wird von Binärdaten überschrieben
+            contentType: 'audio/mp4',
             upsert: true
           });
         
@@ -971,7 +982,7 @@
           throw uploadError;
         }
         
-        // Lösche die alte Datei
+        // Delete old file
         const { error: deleteError } = await supabaseClient.storage
           .from('podcast-audio')
           .remove([fileName]);
@@ -981,11 +992,9 @@
           throw deleteError;
         }
         
-        // Aktualisiere myUploads Liste, falls der Benutzer diese Datei besitzt
+        // Update myUploads list
         if (myUploads.includes(fileName)) {
-          // Entferne alten Namen
           myUploads = myUploads.filter(name => name !== fileName);
-          // Füge neuen Namen hinzu
           myUploads.push(newFileName);
           localStorage.setItem('myUploads', JSON.stringify(myUploads));
           appSettings.myUploads = myUploads;
@@ -1243,7 +1252,7 @@
           
           // GainNode für die Verstärkung erstellen
           gainNode = audioContext.createGain();
-          gainNode.gain.value = GAIN_VALUE; // Verstärkung um Faktor 1.5
+          gainNode.gain.value = GAIN_VALUE; // Verstärkung um Faktor 1.25
           
           // Verbindung herstellen: Quelle -> Verstärker
           source.connect(gainNode);
@@ -1600,6 +1609,9 @@
     function downloadAllFiles() {
       showMessage("ZIP-Datei wird vorbereitet...", false);
       
+      // Mehr Debugging und robuste Fehlerbehandlung
+      console.log("Starte Download aller Dateien...");
+      
       supabaseClient.storage
         .from('podcast-audio')
         .list('', { 
@@ -1607,7 +1619,12 @@
           sortBy: { column: 'name', order: 'asc' }
         })
         .then(function(response) {
+          if (response.error) {
+            throw response.error;
+          }
+          
           const data = response.data || [];
+          console.log(`${data.length} Dateien gefunden zum Herunterladen.`);
           
           if (!data || data.length === 0) {
             showWarning("Keine Dateien zum Herunterladen vorhanden.");
@@ -1622,24 +1639,42 @@
           // Fortschritt anzeigen
           showMessage(`Lade 0/${data.length} Dateien...`, false);
           
-          // Alle Dateien herunterladen und zum ZIP hinzufügen
+          // Alle Dateien herunterladen und zum ZIP hinzufügen mit verbesserter Fehlerbehandlung
           const downloadPromises = data.map(function(file) {
-            const fileName = file.name;
-            const fileUrl = supabaseClient
-              .storage
-              .from('podcast-audio')
-              .getPublicUrl(fileName).data.publicUrl;
-            
             return new Promise(function(resolve) {
+              const fileName = file.name;
+              console.log(`Beginne Download für Datei: ${fileName}`);
+              
+              const { data: urlData } = supabaseClient
+                .storage
+                .from('podcast-audio')
+                .getPublicUrl(fileName);
+              
+              if (!urlData || !urlData.publicUrl) {
+                console.error(`Konnte keine URL für ${fileName} erhalten`);
+                failedDownloads++;
+                resolve();
+                return;
+              }
+              
+              const fileUrl = urlData.publicUrl;
+              console.log(`URL für ${fileName}: ${fileUrl}`);
+              
+              // Versuche 3x mit zunehmender Verzögerung
               let attempts = 0;
+              const maxAttempts = 3;
               
               function attemptDownload() {
                 // Cache-Buster hinzufügen
                 const cacheBustedUrl = fileUrl + (fileUrl.includes('?') ? '&' : '?') + 'cb=' + Date.now();
                 
+                console.log(`Versuch ${attempts+1}/${maxAttempts} für ${fileName}`);
+                
                 fetch(cacheBustedUrl)
                   .then(function(response) {
-                    if (!response.ok) throw new Error(`HTTP Fehler: ${response.status}`);
+                    if (!response.ok) {
+                      throw new Error(`HTTP Fehler: ${response.status}`);
+                    }
                     return response.blob();
                   })
                   .then(function(blob) {
@@ -1647,17 +1682,22 @@
                     const displayName = getDisplayFileName(fileName);
                     zip.file(displayName, blob);
                     completedDownloads++;
+                    console.log(`Datei ${fileName} erfolgreich heruntergeladen (${completedDownloads}/${data.length})`);
                     showMessage(`Lade ${completedDownloads}/${data.length} Dateien...`, false);
                     resolve();
                   })
                   .catch(function(fetchError) {
+                    console.error(`Fetch Fehler für ${fileName} (Versuch ${attempts+1}):`, fetchError);
+                    
                     attempts++;
-                    if (attempts < 3) {
-                      setTimeout(attemptDownload, 1000); // 1s warten
+                    if (attempts < maxAttempts) {
+                      const delay = attempts * 1000; // Zunehmende Verzögerung (1s, 2s, 3s)
+                      console.log(`Neuer Versuch für ${fileName} in ${delay}ms...`);
+                      setTimeout(attemptDownload, delay);
                     } else {
-                      console.error(`Fehler beim Laden von ${fileName}:`, fetchError);
+                      console.error(`Alle Versuche für ${fileName} fehlgeschlagen.`);
                       failedDownloads++;
-                      resolve(); // Trotzdem auflösen
+                      resolve(); // Trotzdem auflösen, damit andere Dateien verarbeitet werden können
                     }
                   });
               }
@@ -1670,6 +1710,7 @@
           Promise.all(downloadPromises)
             .then(function() {
               // ZIP erstellen und herunterladen
+              console.log(`Alle Downloads abgeschlossen. Erstelle ZIP-Datei mit ${completedDownloads} Dateien.`);
               showMessage("ZIP-Datei wird erstellt...", false);
               return zip.generateAsync({ type: "blob" });
             })
@@ -1677,17 +1718,31 @@
               // Aktuelles Datum für Dateinamen
               const date = new Date();
               const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+              const zipFileName = `podcast-aufnahmen-${dateStr}.zip`;
               
-              saveAs(content, `podcast-aufnahmen-${dateStr}.zip`);
+              console.log(`ZIP-Datei erstellt. Größe: ${formatBytes(content.size)}. Name: ${zipFileName}`);
               
-              if (failedDownloads > 0) {
-                showWarning(`ZIP-Datei erstellt mit ${completedDownloads} Dateien. ${failedDownloads} Dateien konnten nicht geladen werden.`);
-              } else {
-                showSuccess("ZIP-Datei wurde erstellt und heruntergeladen.");
+              try {
+                saveAs(content, zipFileName);
+                console.log("ZIP-Datei-Download gestartet.");
+                
+                if (failedDownloads > 0) {
+                  showWarning(`ZIP-Datei erstellt mit ${completedDownloads} Dateien. ${failedDownloads} Dateien konnten nicht geladen werden.`);
+                } else {
+                  showSuccess("ZIP-Datei wurde erstellt und heruntergeladen.");
+                }
+              } catch (saveError) {
+                console.error("Fehler beim Speichern der ZIP-Datei:", saveError);
+                showError("Fehler beim Speichern der ZIP-Datei: " + saveError.message);
               }
+            })
+            .catch(function(zipError) {
+              console.error("Fehler beim Erstellen der ZIP-Datei:", zipError);
+              showError("Fehler beim ZIP-Erstellen: " + zipError.message);
             });
         })
         .catch(function(err) {
+          console.error("Fehler beim Auflisten der Dateien:", err);
           showError("Fehler beim ZIP-Erstellen: " + err.message);
         });
     }
