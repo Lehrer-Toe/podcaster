@@ -9,6 +9,9 @@ const SUPER_ADMIN_PASSWORD = "Luna";
 // Präfix und Suffix für öffentliche Dateien
 const PUBLIC_PREFIX = "public_";
 
+// Größe der Audio-Chunks in Millisekunden
+const AUDIO_CHUNK_SIZE = 1000; // 1 Sekunde pro Chunk für bessere Kompatibilität
+
 // Initialisiere Supabase Client - nur EINMAL für die gesamte App
 let supabaseClient;
 try {
@@ -60,7 +63,6 @@ let currentRecordingBlob = null;
 let audioContext, analyser, dataArray, animationId;
 let recordingTime = 0;
 let recordingInterval = null;
-let isPaused = false;
 let isRecording = false;
 
 // Variable für den Audio-Verstärker (GainNode)
@@ -90,8 +92,6 @@ myUploads = appSettings.myUploads;
 // --- 3) DOM-Elemente ---
 const filenameInput    = document.getElementById("filename");
 const startBtn         = document.getElementById("startBtn");
-const pauseBtn         = document.getElementById("pauseBtn");
-const resumeBtn        = document.getElementById("resumeBtn");
 const stopBtn          = document.getElementById("stopBtn");
 const uploadBtn        = document.getElementById("uploadBtn");
 const clearStorageBtn  = document.getElementById("clearStorageBtn");
@@ -103,7 +103,6 @@ const adminFileList    = document.getElementById("adminFileList");
 const adminLoginBtn    = document.getElementById("adminLoginBtn");
 const closeAdminBtn    = document.getElementById("closeAdminBtn");
 const refreshAdminBtn  = document.getElementById("refreshAdminBtn");
-const visualizerCircle = document.getElementById("visualizerCircle");
 const downloadAllBtn   = document.getElementById("downloadAllBtn");
 const timerDisplay     = document.getElementById("timerDisplay");
 const recordingStatus  = document.getElementById("recordingStatus");
@@ -240,7 +239,8 @@ function loadFilesByREST() {
       console.error("Fehler beim Laden der Dateien:", err);
       fileList.innerHTML = "<li class='error-message'>Fehler beim Laden der Dateien: " + (err.message || "Unbekannter Fehler") + "</li>";
     });
-}// --- Funktion zum Laden der Admin-Dateien ---
+}
+// --- Funktion zum Laden der Admin-Dateien ---
 function loadAdminFilesByREST() {
   adminFileList.innerHTML = "<li>Dateien werden geladen...</li>";
   
@@ -478,156 +478,14 @@ async function setFilePublic(fileName, isPublic) {
   }
 }
 
-// --- Event Listeners ---
-function setupEventListeners() {
-  // Dateiname-Validierung
-  filenameInput.addEventListener("input", validateFileName);
-  
-  // Aufnahme-Steuerung
-  startBtn.addEventListener("click", startRecording);
-  pauseBtn.addEventListener("click", pauseRecording);
-  resumeBtn.addEventListener("click", resumeRecording);
-  stopBtn.addEventListener("click", stopRecording);
-  uploadBtn.addEventListener("click", uploadRecording);
-  clearStorageBtn.addEventListener("click", clearAllLocalStorage);
-  
-  // Admin-Bereich
-  adminLoginBtn.addEventListener("click", showPasswordModal);
-  closeAdminBtn.addEventListener("click", () => {
-    adminPanel.style.display = "none";
-    appSettings.adminLoggedIn = false;
-    appSettings.adminType = '';
-  });
-  downloadAllBtn.addEventListener("click", downloadAllFiles);
-  refreshAdminBtn.addEventListener("click", loadAdminFilesByREST);
-  
-  // Password Modal
-  confirmLoginBtn.addEventListener("click", handleAdminLogin);
-  cancelLoginBtn.addEventListener("click", hidePasswordModal);
-  adminPasswordInput.addEventListener("keyup", (e) => {
-    if (e.key === "Enter") {
-      handleAdminLogin();
-    }
-  });
-  
-  // Tab-Navigation
-  tabButtons.forEach(button => {
-    button.addEventListener("click", () => {
-      const tabId = button.dataset.tab;
-      
-      // Aktiven Tab wechseln
-      tabButtons.forEach(btn => btn.classList.remove("active"));
-      tabContents.forEach(content => content.classList.remove("active"));
-      
-      button.classList.add("active");
-      document.getElementById(`${tabId}-tab`).classList.add("active");
-    });
-  });
-
-  // Dateiliste Verwalten (für Admin)
-  adminFileList.addEventListener("click", handleAdminFileAction);
-  
-  // Zurück-Button
-  backToTeacherSelectionBtn.addEventListener("click", () => {
-    // Zurück zur Lehrerauswahl
-    localStorage.removeItem('selectedTeacherCode');
-    localStorage.removeItem('selectedTeacherName');
-    window.location.href = 'index.html';
-  });
-  
-  // Für iOS Touch-Events aktivieren
-  if (appSettings.isIOS) {
-    document.addEventListener('touchstart', function(){}, {passive: true});
-  }
-}
-
-// --- 7) Dateiname-Validierung ---
-function validateFileName() {
-  const filename = filenameInput.value.trim();
-  const teacherCode = appSettings.selectedTeacherCode;
-  
-  // Prüfe, ob der Dateiname mit dem Lehrercode beginnt
-  if (filename && teacherCode) {
-    if (!filename.startsWith(teacherCode + "_")) {
-      // Wenn der Dateiname nicht mit dem Code beginnt, füge ihn hinzu
-      filenameInput.value = teacherCode + "_" + filename;
-      localStorage.setItem('lastFileName', filenameInput.value);
-    }
-    
-    startBtn.disabled = false;
-  } else if (filename) {
-    startBtn.disabled = false;
-    localStorage.setItem('lastFileName', filename);
-  } else {
-    startBtn.disabled = true;
-  }
-
-  // Debug-Information
-  console.log("Dateiname validiert:", filenameInput.value, "Start-Button aktiviert:", !startBtn.disabled);
-}
-
-// --- 7.1) Admin-Login-Funktion ---
-function handleAdminLogin() {
-  const enteredPassword = adminPasswordInput.value;
-  
-  // Prüfe Lehrer-Admin
-  if (enteredPassword === TEACHER_ADMIN_PASSWORD) {
-    // Lehrer-Admin kann nur eigene Dateien sehen
-    appSettings.adminLoggedIn = true;
-    appSettings.adminType = 'teacher';
-    hidePasswordModal();
-    adminPanel.style.display = 'block';
-    
-    // Admin-Dateien laden (nur für diesen Lehrer)
-    loadAdminFilesByREST();
-    
-    showSuccess(`Admin-Bereich für ${appSettings.selectedTeacherName} freigeschaltet.`);
-  }
-  // Prüfe Super-Admin
-  else if (enteredPassword === SUPER_ADMIN_PASSWORD) {
-    // Super-Admin sieht alle Dateien
-    appSettings.adminLoggedIn = true;
-    appSettings.adminType = 'super';
-    hidePasswordModal();
-    adminPanel.style.display = 'block';
-    
-    // Admin-Dateien laden (alle)
-    loadAdminFilesByREST();
-    
-    showSuccess("Super-Admin-Bereich freigeschaltet.");
-  }
-  else {
-    // Falsches Passwort
-    showError("Falsches Passwort!");
-    adminPasswordInput.value = "";
-    adminPasswordInput.focus();
-  }
-}
-
-// --- 7.2) Zeige Password Modal ---
-function showPasswordModal() {
-  passwordModal.style.display = "block";
-  adminPasswordInput.value = "";
-  adminPasswordInput.focus();
-}
-
-// --- 7.3) Verstecke Password Modal ---
-function hidePasswordModal() {
-  passwordModal.style.display = "none";
-}
-
-// Seite initialisieren, wenn das DOM geladen ist
-document.addEventListener('DOMContentLoaded', init);
 // --- Beste Audio-Format-Erkennung ---
 function determineOptimalAudioFormat() {
   // Für iOS-Geräte werden wir diese Formate in dieser Reihenfolge testen
   const formatsToTest = [
+    'audio/webm',
     'audio/mp4',
-    'audio/aac',
-    'audio/wav',
     'audio/mpeg',
-    'audio/webm;codecs=pcm',
-    'audio/webm'
+    'audio/wav'
   ];
   
   let foundFormat = false;
@@ -681,6 +539,148 @@ function getFileExtension(mimeType) {
   return extensionMap[mimeType] || '.m4a'; // Standardmäßig .m4a für iOS
 }
 
+// --- 6) Event Listeners ---
+function setupEventListeners() {
+  // Dateiname-Validierung
+  filenameInput.addEventListener("input", validateFileName);
+  
+  // Aufnahme-Steuerung (ohne Pause/Resume)
+  startBtn.addEventListener("click", startRecording);
+  stopBtn.addEventListener("click", stopRecording);
+  uploadBtn.addEventListener("click", uploadRecording);
+  clearStorageBtn.addEventListener("click", clearAllLocalStorage);
+  
+  // Admin-Bereich
+  adminLoginBtn.addEventListener("click", showPasswordModal);
+  closeAdminBtn.addEventListener("click", () => {
+    adminPanel.style.display = "none";
+    appSettings.adminLoggedIn = false;
+    appSettings.adminType = '';
+  });
+  downloadAllBtn.addEventListener("click", downloadAllFiles);
+  refreshAdminBtn.addEventListener("click", loadAdminFilesByREST);
+  
+  // Password Modal
+  confirmLoginBtn.addEventListener("click", handleAdminLogin);
+  cancelLoginBtn.addEventListener("click", hidePasswordModal);
+  adminPasswordInput.addEventListener("keyup", (e) => {
+    if (e.key === "Enter") {
+      handleAdminLogin();
+    }
+  });
+  
+  // Tab-Navigation
+  tabButtons.forEach(button => {
+    button.addEventListener("click", () => {
+      const tabId = button.dataset.tab;
+      
+      // Aktiven Tab wechseln
+      tabButtons.forEach(btn => btn.classList.remove("active"));
+      tabContents.forEach(content => content.classList.remove("active"));
+      
+      button.classList.add("active");
+      document.getElementById(`${tabId}-tab`).classList.add("active");
+    });
+  });
+
+  // Dateiliste Verwalten (für Admin)
+  adminFileList.addEventListener("click", handleAdminFileAction);
+  
+  // Zurück-Button
+  backToTeacherSelectionBtn.addEventListener("click", () => {
+    // Zurück zur Lehrerauswahl
+    localStorage.removeItem('selectedTeacherCode');
+    localStorage.removeItem('selectedTeacherName');
+    window.location.href = 'index.html';
+  });
+  
+  // Audio-Player-Fehlerbehandlung
+  audioPlayer.addEventListener('error', function(e) {
+    console.error('Audio-Player-Fehler:', e);
+    console.log('Audio-Quelle:', audioPlayer.src);
+    showError("Fehler beim Abspielen der Aufnahme. Versuchen Sie es erneut.");
+  });
+  
+  // Für iOS Touch-Events aktivieren
+  if (appSettings.isIOS) {
+    document.addEventListener('touchstart', function(){}, {passive: true});
+  }
+}
+
+// --- 7) Dateiname-Validierung ---
+function validateFileName() {
+  const filename = filenameInput.value.trim();
+  const teacherCode = appSettings.selectedTeacherCode;
+  
+  // Prüfe, ob der Dateiname mit dem Lehrercode beginnt
+  if (filename && teacherCode) {
+    if (!filename.startsWith(teacherCode + "_")) {
+      // Wenn der Dateiname nicht mit dem Code beginnt, füge ihn hinzu
+      filenameInput.value = teacherCode + "_" + filename;
+      localStorage.setItem('lastFileName', filenameInput.value);
+    }
+    
+    startBtn.disabled = false;
+  } else if (filename) {
+    startBtn.disabled = false;
+    localStorage.setItem('lastFileName', filename);
+  } else {
+    startBtn.disabled = true;
+  }
+
+  // Debug-Information
+  console.log("Dateiname validiert:", filenameInput.value, "Start-Button aktiviert:", !startBtn.disabled);
+}
+// --- 7.1) Admin-Login-Funktion ---
+function handleAdminLogin() {
+  const enteredPassword = adminPasswordInput.value;
+  
+  // Prüfe Lehrer-Admin
+  if (enteredPassword === TEACHER_ADMIN_PASSWORD) {
+    // Lehrer-Admin kann nur eigene Dateien sehen
+    appSettings.adminLoggedIn = true;
+    appSettings.adminType = 'teacher';
+    hidePasswordModal();
+    adminPanel.style.display = 'block';
+    
+    // Admin-Dateien laden (nur für diesen Lehrer)
+    loadAdminFilesByREST();
+    
+    showSuccess(`Admin-Bereich für ${appSettings.selectedTeacherName} freigeschaltet.`);
+  }
+  // Prüfe Super-Admin
+  else if (enteredPassword === SUPER_ADMIN_PASSWORD) {
+    // Super-Admin sieht alle Dateien
+    appSettings.adminLoggedIn = true;
+    appSettings.adminType = 'super';
+    hidePasswordModal();
+    adminPanel.style.display = 'block';
+    
+    // Admin-Dateien laden (alle)
+    loadAdminFilesByREST();
+    
+    showSuccess("Super-Admin-Bereich freigeschaltet.");
+  }
+  else {
+    // Falsches Passwort
+    showError("Falsches Passwort!");
+    adminPasswordInput.value = "";
+    adminPasswordInput.focus();
+  }
+}
+
+// --- 7.2) Zeige Password Modal ---
+function showPasswordModal() {
+  passwordModal.style.display = "block";
+  adminPasswordInput.value = "";
+  adminPasswordInput.focus();
+}
+
+// --- 7.3) Verstecke Password Modal ---
+function hidePasswordModal() {
+  passwordModal.style.display = "none";
+}
+
 // --- 7.4) Lokalen Speicher vollständig löschen ---
 function clearAllLocalStorage() {
   if (confirm("Möchten Sie wirklich den gesamten lokalen Speicher löschen? Dies entfernt alle gespeicherten Aufnahmen und Einstellungen.")) {
@@ -712,7 +712,7 @@ function clearAllLocalStorage() {
   }
 }
 
-// --- 8) Aufnahme starten ---
+// --- 8) Aufnahme starten --- ÜBERARBEITET FÜR BESSERE KOMPATIBILITÄT
 function startRecording() {
   // Dateiname aus Input holen und sicherstellen, dass der Lehrer-Code enthalten ist
   let filename = filenameInput.value.trim();
@@ -731,96 +731,115 @@ function startRecording() {
   
   if (!checkBrowserSupport()) return;
   
-  // Spezielle Constraints für iOS
-  const constraints = {
-    audio: true
-  };
-  
-  if (appSettings.isIOS) {
-    // iOS benötigt manchmal explizite Einstellungen
-    constraints.audio = {
-      echoCancellation: false,
-      noiseSuppression: false,
-      autoGainControl: false
-    };
+  // Bereinige vorherige Aufnahme
+  audioChunks = [];
+  if (currentRecordingBlob) {
+    URL.revokeObjectURL(audioPlayer.src);
+    currentRecordingBlob = null;
   }
+  
+  // Optimierte Audioeinstellungen
+  const constraints = {
+    audio: {
+      // Zuverlässige Standardeinstellungen
+      channelCount: 1,               // Mono für bessere Kompatibilität
+      echoCancellation: true,        // Hilfreich für Sprachaufnahmen
+      noiseSuppression: true,        // Verbessert Sprachqualität
+      autoGainControl: true          // Hilft, die Lautstärke zu stabilisieren
+    }
+  };
   
   // Audiostream anfordern
   navigator.mediaDevices.getUserMedia(constraints)
     .then(function(stream) {
       audioStream = stream;
       
-      audioContext = new AudioContext();
-      const source = audioContext.createMediaStreamSource(stream);
-      
-      // GainNode für die Verstärkung erstellen
-      gainNode = audioContext.createGain();
-      gainNode.gain.value = GAIN_VALUE; // Verstärkung um Faktor 1.25
-      
-      // Verbindung herstellen: Quelle -> Verstärker
-      source.connect(gainNode);
-      
-      // Destination für MediaRecorder
-      const destination = audioContext.createMediaStreamDestination();
-      gainNode.connect(destination);
-      
-      // WICHTIG: Der verstärkte Stream für den MediaRecorder
-      const amplifiedStream = destination.stream;
-      
-      // MediaRecorder initialisieren
-      let recorderOptions = {};
-      
-      // Verwende das beste erkannte Format, wenn verfügbar
-      if (appSettings.bestAudioFormat) {
-        recorderOptions.mimeType = appSettings.bestAudioFormat;
-        console.log(`Verwende Format: ${appSettings.bestAudioFormat}`);
-      } else {
-        console.log("Verwende Standard-Format des Browsers");
-      }
-      
       try {
-        // Verstärkten Stream für die Aufnahme verwenden
-        mediaRecorder = new MediaRecorder(amplifiedStream, recorderOptions);
-      } catch (formatError) {
-        console.error("Format wird nicht unterstützt:", formatError);
-        console.log("Versuche ohne mimeType-Angabe...");
-        mediaRecorder = new MediaRecorder(amplifiedStream);
+        // Vollständig zurücksetzen, falls bereits vorhanden
+        if (audioContext) {
+          audioContext.close().catch(() => {});
+        }
         
-        // Update formatInfo-Anzeige
-        currentFormat.textContent = "Standard (geräteabhängig)";
+        audioContext = new AudioContext();
+        const source = audioContext.createMediaStreamSource(stream);
+        
+        // GainNode für die Verstärkung erstellen
+        gainNode = audioContext.createGain();
+        gainNode.gain.value = GAIN_VALUE; // Verstärkung um Faktor 1.25
+        
+        // Verbindung herstellen: Quelle -> Verstärker
+        source.connect(gainNode);
+        
+        // Destination für MediaRecorder
+        const destination = audioContext.createMediaStreamDestination();
+        gainNode.connect(destination);
+        
+        // WICHTIG: Der verstärkte Stream für den MediaRecorder
+        const amplifiedStream = destination.stream;
+        
+        // MediaRecorder initialisieren mit besten Optionen
+        // Wir verwenden kleinere Chunks für bessere Zuverlässigkeit
+        let recorderOptions = {
+          audioBitsPerSecond: 128000  // 128 kbps - gute Qualität
+        };
+        
+        // Verwende das beste erkannte Format, wenn verfügbar
+        if (appSettings.bestAudioFormat) {
+          recorderOptions.mimeType = appSettings.bestAudioFormat;
+          console.log(`Verwende Format: ${appSettings.bestAudioFormat}`);
+        } else {
+          console.log("Verwende Standard-Format des Browsers");
+        }
+        
+        try {
+          // Verstärkten Stream für die Aufnahme verwenden
+          mediaRecorder = new MediaRecorder(amplifiedStream, recorderOptions);
+        } catch (formatError) {
+          console.error("Format wird nicht unterstützt:", formatError);
+          console.log("Versuche ohne mimeType-Angabe...");
+          mediaRecorder = new MediaRecorder(amplifiedStream, {
+            audioBitsPerSecond: 128000
+          });
+          
+          // Update formatInfo-Anzeige
+          currentFormat.textContent = "Standard (geräteabhängig)";
+        }
+        
+        // MediaRecorder-Format anzeigen
+        if (mediaRecorder.mimeType) {
+          currentFormat.textContent = formatReadableName(mediaRecorder.mimeType);
+          console.log("Tatsächlich verwendetes Format:", mediaRecorder.mimeType);
+          appSettings.bestAudioFormat = mediaRecorder.mimeType;
+        }
+        
+        // Event Handling
+        mediaRecorder.ondataavailable = handleDataAvailable;
+        mediaRecorder.onstop = handleRecordingStop;
+        mediaRecorder.onerror = function(event) {
+          showError("Aufnahmefehler: " + event.error);
+          stopRecording();
+        };
+        
+        // Überwachung für kritische Fehler
+        mediaRecorder.addEventListener('error', function(e) {
+          console.error('MediaRecorder Fehler:', e);
+          stopRecording();
+        });
+        
+        // Aufnahme starten
+        mediaRecorder.start(AUDIO_CHUNK_SIZE); // Häufigere, kleinere Chunks für bessere Zuverlässigkeit
+        isRecording = true;
+        
+        // UI aktualisieren
+        updateRecordingUI(true);
+        startTimer();
+        
+        showMessage("Aufnahme läuft...");
+      } catch (error) {
+        console.error("Aufnahme-Setup-Fehler:", error);
+        cleanupRecording();
+        showError("Fehler beim Starten der Aufnahme: " + error.message);
       }
-      
-      // MediaRecorder-Format anzeigen
-      if (mediaRecorder.mimeType) {
-        currentFormat.textContent = formatReadableName(mediaRecorder.mimeType);
-        console.log("Tatsächlich verwendetes Format:", mediaRecorder.mimeType);
-        appSettings.bestAudioFormat = mediaRecorder.mimeType;
-      }
-      
-      audioChunks = [];
-      
-      // Event Handling
-      mediaRecorder.ondataavailable = handleDataAvailable;
-      mediaRecorder.onstop = handleRecordingStop;
-      mediaRecorder.onpause = handleRecordingPause;
-      mediaRecorder.onresume = handleRecordingResume;
-      mediaRecorder.onerror = function(event) {
-        showError("Aufnahmefehler: " + event.error);
-      };
-      
-      // Aufnahme starten
-      mediaRecorder.start(100); // Chunks alle 100ms für bessere iOS-Kompatibilität
-      isRecording = true;
-      isPaused = false;
-      
-      // UI aktualisieren
-      updateRecordingUI(true);
-      
-      // Für den Visualizer den ursprünglichen Stream verwenden (ohne Verstärkung)
-      startVisualizer(stream);
-      startTimer();
-      
-      showMessage("Aufnahme läuft...", true);
     })
     .catch(function(err) {
       let errorMsg = "Aufnahmefehler";
@@ -838,51 +857,31 @@ function startRecording() {
     });
 }
 
-// --- 9) Aufnahme pausieren ---
-function pauseRecording() {
-  if (mediaRecorder && mediaRecorder.state === "recording") {
-    try {
-      mediaRecorder.pause();
-      isPaused = true;
-      pauseTimer();
-      pauseVisualizer();
-      updateRecordingUI(true, true);
-      showMessage("Aufnahme pausiert", false);
-    } catch (error) {
-      console.error("Fehler beim Pausieren:", error);
-      // Wenn pausieren auf iOS fehlschlägt, bieten wir an, stattdessen zu stoppen
-      if (appSettings.isIOS) {
-        showWarning("Pausieren wird auf einigen iOS-Geräten nicht unterstützt. Bitte stoppen Sie die Aufnahme, wenn Sie fertig sind.");
-      }
-    }
+// --- Aufnahme aufräumen ---
+function cleanupRecording() {
+  if (audioStream) {
+    audioStream.getTracks().forEach(track => track.stop());
+    audioStream = null;
   }
-}
-
-// --- 10) Aufnahme fortsetzen ---
-function resumeRecording() {
-  if (mediaRecorder && mediaRecorder.state === "paused") {
-    try {
-      mediaRecorder.resume();
-      isPaused = false;
-      resumeTimer();
-      resumeVisualizer();
-      updateRecordingUI(true, false);
-      showMessage("Aufnahme fortgesetzt", true);
-    } catch (error) {
-      console.error("Fehler beim Fortsetzen:", error);
-      showWarning("Es gab ein Problem beim Fortsetzen der Aufnahme. Versuchen Sie, die Aufnahme zu stoppen und neu zu starten.");
-    }
+  
+  if (audioContext) {
+    audioContext.close().catch(() => {});
+    audioContext = null;
   }
+  
+  mediaRecorder = null;
+  isRecording = false;
 }
 
 // --- 11) Aufnahme stoppen ---
 function stopRecording() {
   if (mediaRecorder && (mediaRecorder.state === "recording" || mediaRecorder.state === "paused")) {
     try {
+      // Sicherer Stopp
       mediaRecorder.stop();
       isRecording = false;
-      isPaused = false;
       
+      // Bereinigung
       if (audioStream) {
         audioStream.getTracks().forEach(function(track) {
           track.stop();
@@ -890,10 +889,9 @@ function stopRecording() {
       }
       
       stopTimer();
-      stopVisualizer();
       updateRecordingUI(false);
       
-      // AudioContext und GainNode schließen
+      // AudioContext schließen
       if (audioContext) {
         audioContext.close().catch(err => console.warn("Fehler beim Schließen des AudioContext:", err));
       }
@@ -903,64 +901,70 @@ function stopRecording() {
       
       // Notfall-Reset falls das Stoppen nicht funktioniert
       isRecording = false;
-      isPaused = false;
-      stopTimer();
-      stopVisualizer();
+      cleanupRecording();
       updateRecordingUI(false);
-      
-      if (audioStream) {
-        audioStream.getTracks().forEach(function(track) {
-          track.stop();
-        });
-      }
-      
-      // AudioContext und GainNode schließen im Fehlerfall
-      if (audioContext) {
-        audioContext.close().catch(err => console.warn("Fehler beim Schließen des AudioContext:", err));
-      }
     }
   }
 }
 
-// --- 12) Media Recorder Event Handler ---
+// --- 12) Media Recorder Event Handler --- VERBESSERT
 function handleDataAvailable(event) {
   if (event.data && event.data.size > 0) {
     audioChunks.push(event.data);
-    // Speichere den aktuellen Stand im LocalStorage
-    saveRecordingChunks();
   }
 }
 
+// Verbesserte Funktion zum Verarbeiten der Aufnahme
 function handleRecordingStop() {
   try {
-    // Erstelle Blob aus gesammelten Daten
-    const mimeType = appSettings.bestAudioFormat || 'audio/mp4';
-    currentRecordingBlob = new Blob(audioChunks, { type: mimeType });
+    // Wenn keine Chunks vorhanden sind, Fehler anzeigen
+    if (audioChunks.length === 0) {
+      showError("Keine Audiodaten aufgenommen. Bitte versuchen Sie es erneut.");
+      return;
+    }
     
-    // Audio-Player aktualisieren
-    const audioUrl = URL.createObjectURL(currentRecordingBlob);
+    // Log der Chunks für die Fehlerbehebung
+    console.log(`${audioChunks.length} Audiochunks aufgenommen. Gesamtlänge wird berechnet...`);
+    
+    // Erzwinge ein bestimmtes Format für die Ausgabe
+    // Dies verbessert die Kompatibilität beim Abspielen
+    const mimeType = 'audio/mp4'; // Hohe Kompatibilität auf allen Geräten
+    
+    // Neuen Blob mit allen Chunks erzeugen
+    const finalBlob = new Blob(audioChunks, { type: mimeType });
+    
+    // Größe und Länge überprüfen
+    console.log("Aufnahme abgeschlossen. Größe:", formatBytes(finalBlob.size));
+    
+    if (finalBlob.size < 100) {
+      showError("Die Aufnahme ist zu klein. Bitte versuchen Sie es erneut.");
+      return;
+    }
+    
+    // Alte Blob-URL freigeben
+    if (audioPlayer.src) {
+      URL.revokeObjectURL(audioPlayer.src);
+    }
+    
+    // Speichern und Anzeigen des neuen Blobs
+    currentRecordingBlob = finalBlob;
+    const audioUrl = URL.createObjectURL(finalBlob);
     audioPlayer.src = audioUrl;
+    
+    // Explizites Laden des Audios erzwingen
+    audioPlayer.load();
     
     // UI aktualisieren
     uploadBtn.disabled = false;
-    showMessage("Aufnahme bereit – bitte jetzt anhören und hochladen.", false);
+    showMessage("Aufnahme bereit – bitte jetzt anhören und hochladen.");
     
     // Lokale Kopie speichern
-    saveRecording(currentRecordingBlob, mimeType);
+    saveRecording(finalBlob, mimeType);
     
-    console.log("Aufnahme erfolgreich gestoppt. Größe:", formatBytes(currentRecordingBlob.size), "Format:", mimeType);
   } catch (error) {
     console.error("Fehler beim Verarbeiten der Aufnahme:", error);
     showError("Fehler beim Verarbeiten der Aufnahme: " + error.message);
   }
-}
-
-function handleRecordingPause() {
-  showMessage("Aufnahme pausiert", false);
-}
-
-function handleRecordingResume() {
-  showMessage("Aufnahme fortgesetzt", true);
 }
 
 // --- 13) Aufnahme hochladen ---
@@ -970,7 +974,13 @@ function uploadRecording() {
     return;
   }
   
-  showMessage("Wird hochgeladen...", false);
+  // Prüfen, ob die Blob-Größe vernünftig ist
+  if (currentRecordingBlob.size < 1000) {
+    showError("Die Aufnahme ist zu klein zum Hochladen. Bitte nehmen Sie eine neue Aufnahme auf.");
+    return;
+  }
+  
+  showMessage("Wird hochgeladen...");
   uploadBtn.disabled = true;
   
   // Dateinamen vorbereiten und sicherstellen, dass er mit dem Lehrerkürzel beginnt
@@ -982,8 +992,8 @@ function uploadRecording() {
     baseName = teacherCode + "_" + baseName;
   }
   
-  const mimeType = appSettings.bestAudioFormat || 'audio/mp4';
-  let extension = getFileExtension(mimeType);
+  const mimeType = 'audio/mp4'; // Verwende einheitliches Format für bessere Kompatibilität
+  let extension = '.m4a'; // Einheitliche Endung für bessere Kompatibilität
   
   // Aktuelles Datum für den Dateinamen
   const today = new Date();
@@ -993,7 +1003,8 @@ function uploadRecording() {
   
   // Uhrzeit für Eindeutigkeit bei Namensgleichheit
   const timeString = ('0' + today.getHours()).slice(-2) + 
-                    ('0' + today.getMinutes()).slice(-2);
+                    ('0' + today.getMinutes()).slice(-2) +
+                    ('0' + today.getSeconds()).slice(-2);
   
   // Eindeutigen Dateinamen erstellen
   let fileName = `${baseName}_${dateString}_${timeString}${extension}`;
@@ -1027,6 +1038,9 @@ function uploadRecording() {
       // Lokale Aufnahme löschen
       clearSavedRecording();
       
+      // Audio-Player zurücksetzen
+      audioPlayer.src = '';
+      
       // Dateiliste aktualisieren
       refreshFileList();
     })
@@ -1036,7 +1050,6 @@ function uploadRecording() {
       uploadBtn.disabled = false;
     });
 }
-
 // --- 14) Admin-Dateiaktionen mit echtem Löschen und Sichtbarkeitsänderung ---
 function handleAdminFileAction(e) {
   const target = e.target;
@@ -1123,9 +1136,10 @@ function handleAdminFileAction(e) {
       });
   }
 }
+
 // --- 15) Alles herunterladen (ZIP) ---
 function downloadAllFiles() {
-  showMessage("ZIP-Datei wird vorbereitet...", false);
+  showMessage("ZIP-Datei wird vorbereitet...");
   
   // Mehr Debugging und robuste Fehlerbehandlung
   console.log("Starte Download aller Dateien...");
@@ -1168,7 +1182,7 @@ function downloadAllFiles() {
       let failedDownloads = 0;
       
       // Fortschritt anzeigen
-      showMessage(`Lade 0/${data.length} Dateien...`, false);
+      showMessage(`Lade 0/${data.length} Dateien...`);
       
       // Alle Dateien herunterladen und zum ZIP hinzufügen mit verbesserter Fehlerbehandlung
       const downloadPromises = data.map(function(file) {
@@ -1214,7 +1228,7 @@ function downloadAllFiles() {
                 zip.file(displayName, blob);
                 completedDownloads++;
                 console.log(`Datei ${fileName} erfolgreich heruntergeladen (${completedDownloads}/${data.length})`);
-                showMessage(`Lade ${completedDownloads}/${data.length} Dateien...`, false);
+                showMessage(`Lade ${completedDownloads}/${data.length} Dateien...`);
                 resolve();
               })
               .catch(function(fetchError) {
@@ -1242,7 +1256,7 @@ function downloadAllFiles() {
         .then(function() {
           // ZIP erstellen und herunterladen
           console.log(`Alle Downloads abgeschlossen. Erstelle ZIP-Datei mit ${completedDownloads} Dateien.`);
-          showMessage("ZIP-Datei wird erstellt...", false);
+          showMessage("ZIP-Datei wird erstellt...");
           return zip.generateAsync({ type: "blob" });
         })
         .then(function(content) {
@@ -1283,80 +1297,6 @@ function downloadAllFiles() {
     });
 }
 
-// --- 16) Visualizer Funktionen ---
-function startVisualizer(stream) {
-  try {
-    // Wenn audioContext bereits über startRecording initialisiert wurde, erstelle keinen neuen
-    if (!audioContext) {
-      audioContext = new AudioContext();
-    }
-    
-    const source = audioContext.createMediaStreamSource(stream);
-    analyser = audioContext.createAnalyser();
-    analyser.fftSize = 1024;
-    source.connect(analyser);
-    dataArray = new Uint8Array(analyser.frequencyBinCount);
-    
-    // Visualizer starten
-    animateVisualizer();
-  } catch (error) {
-    console.warn("Visualizer konnte nicht initialisiert werden:", error);
-    // Wir brechen die Aufnahme nicht ab, nur weil der Visualizer nicht funktioniert
-  }
-}
-
-function animateVisualizer() {
-  if (!analyser) return;
-  
-  try {
-    animationId = requestAnimationFrame(animateVisualizer);
-    analyser.getByteTimeDomainData(dataArray);
-    
-    // RMS (Root Mean Square) Berechnung für Lautstärke
-    let sum = 0;
-    for (let i = 0; i < dataArray.length; i++) {
-      const val = dataArray[i] - 128;
-      sum += val * val;
-    }
-    
-    const rms = Math.sqrt(sum / dataArray.length);
-    const size = 40 + rms; // Basisgröße + Lautstärke
-    
-    // Kreisgröße aktualisieren
-    visualizerCircle.style.width = size + "px";
-    visualizerCircle.style.height = size + "px";
-  } catch (error) {
-    console.warn("Visualizer-Fehler:", error);
-    cancelAnimationFrame(animationId);
-  }
-}
-
-function pauseVisualizer() {
-  if (animationId) {
-    cancelAnimationFrame(animationId);
-    animationId = null;
-  }
-}
-
-function resumeVisualizer() {
-  if (audioContext && analyser) {
-    animateVisualizer();
-  }
-}
-
-function stopVisualizer() {
-  if (animationId) {
-    cancelAnimationFrame(animationId);
-    animationId = null;
-  }
-  
-  // Audiocontext wird nun im stopRecording geschlossen
-  
-  // Kreisgröße zurücksetzen
-  visualizerCircle.style.width = "40px";
-  visualizerCircle.style.height = "40px";
-}
-
 // --- 17) Timer Funktionen ---
 function startTimer() {
   recordingTime = 0;
@@ -1365,22 +1305,6 @@ function startTimer() {
     recordingTime++;
     updateTimerDisplay(recordingTime);
   }, 1000);
-}
-
-function pauseTimer() {
-  if (recordingInterval) {
-    clearInterval(recordingInterval);
-    recordingInterval = null;
-  }
-}
-
-function resumeTimer() {
-  if (!recordingInterval) {
-    recordingInterval = setInterval(function() {
-      recordingTime++;
-      updateTimerDisplay(recordingTime);
-    }, 1000);
-  }
 }
 
 function stopTimer() {
@@ -1397,28 +1321,16 @@ function updateTimerDisplay(seconds) {
 }
 
 // --- 18) UI-Hilfsfunktionen ---
-function updateRecordingUI(isActive, isPaused = false) {
+function updateRecordingUI(isActive) {
   // Aufnahme aktiv
   if (isActive) {
     startBtn.disabled = true;
     stopBtn.disabled = false;
-    
-    // Pause-Status
-    if (isPaused) {
-      pauseBtn.disabled = true;
-      resumeBtn.disabled = false;
-      recordingStatus.innerHTML = '<span class="status-icon">⏸️</span> Aufnahme pausiert';
-    } else {
-      pauseBtn.disabled = false;
-      resumeBtn.disabled = true;
-      recordingStatus.innerHTML = '<span class="recording-indicator"></span> Aufnahme läuft';
-    }
+    recordingStatus.innerHTML = 'Aufnahme läuft...';
   } 
   // Aufnahme inaktiv
   else {
     startBtn.disabled = false;
-    pauseBtn.disabled = true;
-    resumeBtn.disabled = true;
     stopBtn.disabled = true;
     recordingStatus.innerHTML = '';
   }
@@ -1427,12 +1339,8 @@ function updateRecordingUI(isActive, isPaused = false) {
   validateFileName();
 }
 
-function showMessage(message, isRecording = false) {
-  if (isRecording) {
-    uploadStatus.innerHTML = `<span class="recording-indicator"></span> ${message}`;
-  } else {
-    uploadStatus.textContent = message;
-  }
+function showMessage(message, isRecording) {
+  uploadStatus.textContent = message;
 }
 
 function showError(message) {
@@ -1452,7 +1360,7 @@ function showSuccess(message) {
 // --- 19) Lokale Speicherung ---
 function saveRecording(blob, mimeType) {
   try {
-    // In IndexedDB speichern (vereinfacht mit localStorage)
+    // In localStorage speichern
     localStorage.setItem('lastRecordingMimeType', mimeType);
     
     // Blob als Base64 speichern
@@ -1467,13 +1375,8 @@ function saveRecording(blob, mimeType) {
   }
 }
 
-// Speichert aktuelle Audiochunks (für Wiederherstellung)
 function saveRecordingChunks() {
-  // Wir speichern hier nicht die Chunks selbst, da das zu viel wäre
-  // Stattdessen markieren wir, dass eine Aufnahme läuft
-  if (isRecording) {
-    localStorage.setItem('recordingInProgress', 'true');
-  }
+  // In dieser Version nicht mehr verwendet, da wir die Blob-Zwischenspeicherung verbessert haben
 }
 
 function clearSavedRecording() {
@@ -1510,13 +1413,6 @@ function checkForSavedRecording() {
       clearSavedRecording();
     }
   }
-  
-  // Prüfe, ob eine Aufnahme unterbrochen wurde
-  const inProgress = localStorage.getItem('recordingInProgress');
-  if (inProgress === 'true') {
-    showWarning("Eine frühere Aufnahme wurde unterbrochen. Bitte starten Sie eine neue Aufnahme.");
-    localStorage.removeItem('recordingInProgress');
-  }
 }
 
 // --- 20) Hilfsfunktionen ---
@@ -1531,3 +1427,6 @@ function formatBytes(bytes, decimals = 2) {
   
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
+
+// Seite initialisieren, wenn das DOM geladen ist
+document.addEventListener('DOMContentLoaded', init);

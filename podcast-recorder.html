@@ -16,7 +16,7 @@
 <body>
   <header>
     <h1>Podcast Aufnahme</h1>
-    <div class="version">v4.0</div>
+    <div class="version">v4.1</div>
   </header>
 
   <div class="container">
@@ -39,22 +39,16 @@
         Aktuelles Format: <span id="currentFormat">Wird ermittelt...</span>
       </div>
 
-      <!-- Erste Zeile mit Start und Stopp Buttons -->
+      <!-- Nur die Start und Stopp Buttons -->
       <div class="button-row">
         <button id="startBtn">Aufnahme starten</button>
         <button id="stopBtn" disabled>Stoppen</button>
       </div>
       
-      <!-- Zweite Zeile mit Pause und Fortsetzen Buttons -->
-      <div class="button-row">
-        <button id="pauseBtn" disabled>Pausieren</button>
-        <button id="resumeBtn" disabled>Fortsetzen</button>
-      </div>
-      
-      <!-- Dritte Zeile mit Upload Button -->
+      <!-- Upload Button -->
       <button id="uploadBtn" disabled>Hochladen</button>
       
-      <!-- Vierte Zeile mit Speicher löschen Button -->
+      <!-- Speicher löschen Button -->
       <button id="clearStorageBtn">Lokalen Speicher löschen</button>
     </div>
 
@@ -65,11 +59,6 @@
 
     <!-- Timer-Anzeige -->
     <div id="timerDisplay">00:00</div>
-
-    <!-- Visueller Lautstärke-Indikator -->
-    <div class="visualizer-container">
-      <div class="visualizer-circle" id="visualizerCircle"></div>
-    </div>
 
     <!-- Audio-Vorschau & Status -->
     <audio id="audioPlayer" controls></audio>
@@ -97,7 +86,6 @@
         <ol>
           <li>Geben Sie Ihren Schülername ein</li>
           <li>Klicken Sie auf "Aufnahme starten"</li>
-          <li>Sie können die Aufnahme pausieren und fortsetzen</li>
           <li>Nach dem Stoppen können Sie die Aufnahme anhören</li>
           <li>Klicken Sie auf "Hochladen", um die Aufnahme zu speichern</li>
         </ol>
