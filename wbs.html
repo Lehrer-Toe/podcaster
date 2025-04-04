@@ -1,0 +1,1823 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>WBS Bewertungssystem</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary-color: #4CAF50;
+      --primary-light: #81C784;
+      --primary-dark: #388E3C;
+      --accent-color: #673AB7;
+      --secondary-color: #f7f9fc;
+      --text-color: #333;
+      --success-color: #4caf50;
+      --warning-color: #ff9800;
+      --error-color: #f44336;
+      --border-color: #e0e0e0;
+      --card-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      --transition: all 0.3s ease;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    body {
+      font-family: 'Roboto', sans-serif;
+      background: #f4f4f4;
+      color: var(--text-color);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    
+    header {
+      background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+      color: white;
+      padding: 1.5rem;
+      text-align: center;
+      position: relative;
+      box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+    }
+    
+    h1, h2, h3 {
+      margin-bottom: 15px;
+      color: var(--primary-dark);
+      font-weight: 500;
+    }
+    
+    header h1, header h2, header h3 {
+      color: white;
+    }
+    
+    .container {
+      max-width: 1100px;
+      margin: 2rem auto;
+      background: white;
+      border-radius: 12px;
+      padding: 2rem;
+      box-shadow: var(--card-shadow);
+    }
+    
+    @media (max-width: 768px) {
+      .container {
+        margin: 1rem;
+        padding: 1.5rem;
+      }
+    }
+    
+    .flex-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-start;
+      margin: 15px 0;
+    }
+    
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: var(--card-shadow);
+      transition: var(--transition);
+    }
+    
+    .section {
+      margin-bottom: 25px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    
+    .tabs {
+      display: flex;
+      border-bottom: 2px solid var(--border-color);
+      margin-bottom: 20px;
+    }
+    
+    .tab {
+      padding: 12px 24px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: var(--transition);
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+    }
+    
+    .tab.active {
+      color: var(--primary-color);
+      border-bottom-color: var(--primary-color);
+    }
+    
+    .tab-content {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    input[type="text"],
+    input[type="password"],
+    input[type="date"],
+    select {
+      padding: 0.75rem 1rem;
+      margin: 5px 0;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: var(--transition);
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+    }
+    
+    input[type="text"]:focus,
+    input[type="password"]:focus,
+    input[type="date"]:focus,
+    select:focus {
+      outline: none;
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.2);
+    }
+    
+    input[type="file"] {
+      padding: 10px 0;
+      margin: 5px 0;
+    }
+    
+    button {
+      background-color: var(--primary-color);
+      border: none;
+      color: white;
+      padding: 0.75rem 1rem;
+      margin: 5px 0;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: var(--transition);
+      font-weight: 500;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    button:hover {
+      background-color: var(--primary-light);
+      transform: translateY(-1px);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    .btn-secondary {
+      background-color: var(--accent-color);
+    }
+    
+    .btn-secondary:hover {
+      background-color: #7E57C2;
+    }
+    
+    .btn-warning {
+      background-color: var(--warning-color);
+    }
+    
+    .btn-warning:hover {
+      background-color: #ffb74d;
+    }
+    
+    .btn-danger {
+      background-color: var(--error-color);
+    }
+    
+    .btn-danger:hover {
+      background-color: #e53935;
+    }
+    
+    .btn-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 36px;
+      min-height: 36px;
+      padding: 0;
+      border-radius: 50%;
+      font-size: 1.2rem;
+    }
+    
+    /* Teacher Selection Grid */
+    .teacher-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      margin-top: 2rem;
+    }
+
+    .teacher-card {
+      background: white;
+      border: 2px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .teacher-card:hover {
+      border-color: var(--primary-color);
+      transform: translateY(-5px);
+      box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+
+    .teacher-card img {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      margin-bottom: 1rem;
+      object-fit: cover;
+      background-color: #f0f0f0;
+    }
+
+    .teacher-card h3 {
+      margin: 0.5rem 0;
+      color: #333;
+    }
+    
+    .notification {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 9999;
+      animation: fadeInOut 3s ease forwards;
+      color: white;
+    }
+    
+    .notification.success {
+      background-color: var(--success-color);
+    }
+    
+    .notification.warning {
+      background-color: var(--warning-color);
+    }
+    
+    .notification.error {
+      background-color: var(--error-color);
+    }
+    
+    @keyframes fadeInOut {
+      0% { opacity: 0; transform: translateY(20px); }
+      10% { opacity: 1; transform: translateY(0); }
+      90% { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(20px); }
+    }
+    
+    .version {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      font-size: 0.8rem;
+      opacity: 0.8;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-fade-in {
+      animation: fadeIn 0.3s ease forwards;
+    }
+    
+    /* Assessment parts */
+    
+    /* Main content layout */
+    .main-layout {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    @media (min-width: 992px) {
+      .main-layout {
+        flex-direction: row;
+      }
+      
+      .sidebar {
+        width: 300px;
+        flex-shrink: 0;
+      }
+      
+      .content-area {
+        flex-grow: 1;
+      }
+    }
+    
+    .sidebar {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: var(--card-shadow);
+    }
+    
+    .content-area {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: var(--card-shadow);
+    }
+    
+    /* Student List */
+    .student-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    
+    .student-item {
+      padding: 10px 15px;
+      margin-bottom: 8px;
+      background: #f5f8fa;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    
+    .student-item:hover {
+      background: #e9f0f7;
+    }
+    
+    .student-item.active {
+      background: var(--primary-color);
+      color: white;
+    }
+    
+    .student-name {
+      font-weight: 500;
+    }
+    
+    .student-actions {
+      display: none;
+    }
+    
+    .student-item:hover .student-actions {
+      display: flex;
+      gap: 5px;
+    }
+    
+    /* Assessment form */
+    .grade-display {
+      text-align: center;
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin: 15px 0;
+      color: var(--primary-color);
+    }
+    
+    .assessment-form {
+      margin-top: 20px;
+    }
+    
+    .grade-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin: 15px 0;
+    }
+    
+    .grade-buttons button {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      padding: 0;
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+    
+    .grade-buttons button.selected {
+      background-color: var(--accent-color);
+      transform: scale(1.1);
+    }
+    
+    .grade-buttons button.grade-0 {
+      background-color: #9e9e9e;
+    }
+    
+    .grade-buttons button.grade-1 {
+      background-color: #4caf50;
+    }
+    
+    .grade-buttons button.grade-2 {
+      background-color: #8bc34a;
+    }
+    
+    .grade-buttons button.grade-3 {
+      background-color: #ffeb3b;
+      color: #333;
+    }
+    
+    .grade-buttons button.grade-4 {
+      background-color: #ff9800;
+    }
+    
+    .grade-buttons button.grade-5 {
+      background-color: #ff5722;
+    }
+    
+    .grade-buttons button.grade-6 {
+      background-color: #f44336;
+    }
+    
+    .assessment-category {
+      margin-bottom: 25px;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 15px;
+    }
+    
+    .assessment-category h3 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 1.1rem;
+    }
+    
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 0 0 1px var(--border-color);
+    }
+    
+    thead {
+      background-color: var(--primary-color);
+      color: white;
+    }
+    
+    th {
+      padding: 12px;
+      text-align: left;
+      font-weight: 500;
+    }
+    
+    td {
+      padding: 12px;
+      border-top: 1px solid var(--border-color);
+    }
+    
+    tr:nth-child(even) {
+      background-color: #f7f9fc;
+    }
+    
+    tr:hover {
+      background-color: #e9f0f7;
+    }
+    
+    /* Modals */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .modal-content {
+      background-color: white;
+      padding: 20px;
+      border-radius: 12px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--card-shadow);
+      animation: fadeIn 0.3s ease;
+    }
+    
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 10px;
+    }
+    
+    .modal-header h3 {
+      margin: 0;
+    }
+    
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: #777;
+      min-height: auto;
+    }
+    
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 20px;
+      border-top: 1px solid var(--border-color);
+      padding-top: 15px;
+    }
+    
+    /* Loader */
+    .loader-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(255, 255, 255, 0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+    }
+    
+    .loader {
+      width: 48px;
+      height: 48px;
+      border: 5px solid var(--primary-light);
+      border-bottom-color: var(--primary-color);
+      border-radius: 50%;
+      display: inline-block;
+      box-sizing: border-box;
+      animation: rotation 1s linear infinite;
+    }
+    
+    @keyframes rotation {
+      0% {
+        transform: rotate(0deg);
+      }
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+    
+    /* Badge */
+    .badge {
+      display: inline-block;
+      min-width: 10px;
+      padding: 3px 7px;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+      color: #fff;
+      text-align: center;
+      white-space: nowrap;
+      vertical-align: middle;
+      background-color: var(--primary-color);
+      border-radius: 10px;
+    }
+    
+    .badge.warning {
+      background-color: var(--warning-color);
+    }
+    
+    .badge.danger {
+      background-color: var(--error-color);
+    }
+    
+    /* Teacher info display */
+    .teacher-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    
+    .teacher-info img {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+    }
+    
+    /* Form groups */
+    .form-group {
+      margin-bottom: 15px;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    
+    /* Date display styles */
+    .date-display {
+      font-size: 0.9rem;
+      color: #666;
+    }
+    
+    /* Average grade display */
+    .average-grade {
+      font-size: 1.2rem;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 5px;
+      display: inline-block;
+    }
+    
+    .grade-1 { background-color: rgba(76, 175, 80, 0.2); color: #2e7d32; }
+    .grade-2 { background-color: rgba(139, 195, 74, 0.2); color: #558b2f; }
+    .grade-3 { background-color: rgba(255, 235, 59, 0.2); color: #f9a825; }
+    .grade-4 { background-color: rgba(255, 152, 0, 0.2); color: #ef6c00; }
+    .grade-5 { background-color: rgba(255, 87, 34, 0.2); color: #d84315; }
+    .grade-6 { background-color: rgba(244, 67, 54, 0.2); color: #c62828; }
+  </style>
+</head>
+<body>
+  <!-- Main loading indicator -->
+  <div class="loader-container" id="mainLoader">
+    <span class="loader"></span>
+  </div>
+
+  <!-- Login section -->
+  <div id="loginSection">
+    <header>
+      <h1>WBS Bewertungssystem</h1>
+      <div class="version">v1.0</div>
+    </header>
+    
+    <div class="container animate-fade-in">
+      <h2>Bitte wählen Sie Ihren Benutzer aus</h2>
+      
+      <div class="teacher-grid" id="teacherGrid">
+        <!-- Teacher cards will be generated here -->
+      </div>
+      
+      <!-- Password modal -->
+      <div class="modal" id="passwordModal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>Anmeldung</h3>
+            <button class="modal-close" id="closePasswordModal">&times;</button>
+          </div>
+          <p id="loginPrompt">Bitte geben Sie Ihr Passwort ein:</p>
+          <input type="password" id="passwordInput" placeholder="Passwort">
+          <div class="modal-footer">
+            <button class="btn-danger" id="cancelLogin">Abbrechen</button>
+            <button id="confirmLogin">Anmelden</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Main application section -->
+  <div id="appSection" style="display: none;">
+    <header>
+      <h1>WBS Bewertungssystem</h1>
+      <div id="teacherInfo" class="teacher-info">
+        <!-- Teacher info will be inserted here -->
+      </div>
+      <button id="logoutBtn" class="btn-danger" style="position: absolute; right: 20px; top: 20px;">Abmelden</button>
+    </header>
+    
+    <div class="container">
+      <!-- Tabs -->
+      <div class="tabs">
+        <div class="tab active" data-tab="assessment">Bewertung</div>
+        <div class="tab" data-tab="overview">Übersicht</div>
+        <div class="tab" data-tab="settings">Einstellungen</div>
+      </div>
+      
+      <!-- Assessment Tab -->
+      <div class="tab-content active" id="assessment-tab">
+        <div class="main-layout">
+          <div class="sidebar">
+            <div class="section">
+              <h3>Prüfling anlegen</h3>
+              <div class="form-group">
+                <label for="newStudentName">Name des Prüflings</label>
+                <input type="text" id="newStudentName" placeholder="Vor- und Nachname">
+              </div>
+              <div class="form-group">
+                <label for="examDate">Prüfungsdatum</label>
+                <input type="date" id="examDate">
+              </div>
+              <button id="addStudentBtn">Prüfling hinzufügen</button>
+            </div>
+            
+            <div class="section">
+              <h3>Heutige Prüflinge</h3>
+              <ul class="student-list" id="todayStudentList">
+                <!-- Students will be listed here -->
+              </ul>
+            </div>
+            
+            <div class="section">
+              <h3>Alle Prüflinge</h3>
+              <ul class="student-list" id="allStudentList">
+                <!-- All students will be listed here -->
+              </ul>
+            </div>
+          </div>
+          
+          <div class="content-area" id="assessmentContent">
+            <!-- Assessment form will be shown here -->
+            <div class="card">
+              <h2>Willkommen bei der WBS Bewertungsapp</h2>
+              <p>Bitte wählen Sie einen Prüfling aus der Liste oder legen Sie einen neuen Prüfling an.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Overview Tab -->
+      <div class="tab-content" id="overview-tab">
+        <h2>Übersicht aller Bewertungen</h2>
+        <div id="overviewContent">
+          <!-- Overview data will be shown here -->
+        </div>
+      </div>
+      
+      <!-- Settings Tab -->
+      <div class="tab-content" id="settings-tab">
+        <h2>Einstellungen</h2>
+        
+        <div class="card">
+          <h3>Datenverwaltung</h3>
+          <p>Hier können Sie Ihre Daten sichern oder wiederherstellen.</p>
+          <div class="flex-container">
+            <button id="exportDataBtn" class="btn-secondary">Daten exportieren</button>
+            <button id="importDataBtn" class="btn-secondary">Daten importieren</button>
+          </div>
+          <input type="file" id="importFileInput" style="display: none;">
+        </div>
+        
+        <div class="card" id="adminSettings" style="display: none;">
+          <h3>Administrator-Einstellungen</h3>
+          <p>Diese Einstellungen sind nur für Administratoren verfügbar.</p>
+          <button id="resetAllDataBtn" class="btn-danger">Alle Daten zurücksetzen</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Edit Student Modal -->
+    <div class="modal" id="editStudentModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Prüfling bearbeiten</h3>
+          <button class="modal-close" id="closeEditStudentModal">&times;</button>
+        </div>
+        <div class="form-group">
+          <label for="editStudentName">Name des Prüflings</label>
+          <input type="text" id="editStudentName" placeholder="Vor- und Nachname">
+        </div>
+        <div class="form-group">
+          <label for="editExamDate">Prüfungsdatum</label>
+          <input type="date" id="editExamDate">
+        </div>
+        <div class="modal-footer">
+          <button class="btn-danger" id="deleteStudentBtn">Löschen</button>
+          <button id="saveStudentBtn">Speichern</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Confirm Delete Modal -->
+    <div class="modal" id="confirmDeleteModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Prüfling löschen</h3>
+          <button class="modal-close" id="closeConfirmDeleteModal">&times;</button>
+        </div>
+        <p>Sind Sie sicher, dass Sie diesen Prüfling und alle zugehörigen Bewertungen löschen möchten?</p>
+        <p id="deleteStudentName" style="font-weight: bold;"></p>
+        <div class="modal-footer">
+          <button id="cancelDeleteBtn">Abbrechen</button>
+          <button class="btn-danger" id="confirmDeleteBtn">Löschen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <script>
+    // Supabase configuration
+    const SUPABASE_URL = "https://qzmzlrsfuepbkqwzbrir.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6bXpscnNmdWVwYmtxd3picmlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE5NTkxMzAsImV4cCI6MjA1NzUzNTEzMH0.zLZDSfylloUxlxYPEpfO4VMAdf0cNpUzKH2T9qv8ezI";
+    
+    // Admin password
+    const ADMIN_PASSWORD = "Luna"; // Password for admin access
+    
+    // Initialize Supabase client
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      db: { schema: 'public' },
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false
+      },
+      global: {
+        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+      }
+    });
+    
+    // Global data
+    let currentUser = null;
+    let isAdmin = false;
+    let teacherData = {
+      students: [],
+      assessments: {}
+    };
+    
+    // DOM elements
+    const loginSection = document.getElementById("loginSection");
+    const appSection = document.getElementById("appSection");
+    const teacherGrid = document.getElementById("teacherGrid");
+    const passwordModal = document.getElementById("passwordModal");
+    const passwordInput = document.getElementById("passwordInput");
+    const loginPrompt = document.getElementById("loginPrompt");
+    const confirmLogin = document.getElementById("confirmLogin");
+    const cancelLogin = document.getElementById("cancelLogin");
+    const closePasswordModal = document.getElementById("closePasswordModal");
+    const teacherInfo = document.getElementById("teacherInfo");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const mainLoader = document.getElementById("mainLoader");
+    
+    // Assessment elements
+    const todayStudentList = document.getElementById("todayStudentList");
+    const allStudentList = document.getElementById("allStudentList");
+    const assessmentContent = document.getElementById("assessmentContent");
+    const newStudentName = document.getElementById("newStudentName");
+    const examDate = document.getElementById("examDate");
+    const addStudentBtn = document.getElementById("addStudentBtn");
+    
+    // Overview elements
+    const overviewContent = document.getElementById("overviewContent");
+    
+    // Settings elements
+    const exportDataBtn = document.getElementById("exportDataBtn");
+    const importDataBtn = document.getElementById("importDataBtn");
+    const importFileInput = document.getElementById("importFileInput");
+    const adminSettings = document.getElementById("adminSettings");
+    const resetAllDataBtn = document.getElementById("resetAllDataBtn");
+    
+    // Modal elements
+    const editStudentModal = document.getElementById("editStudentModal");
+    const closeEditStudentModal = document.getElementById("closeEditStudentModal");
+    const editStudentName = document.getElementById("editStudentName");
+    const editExamDate = document.getElementById("editExamDate");
+    const saveStudentBtn = document.getElementById("saveStudentBtn");
+    const deleteStudentBtn = document.getElementById("deleteStudentBtn");
+    const confirmDeleteModal = document.getElementById("confirmDeleteModal");
+    const closeConfirmDeleteModal = document.getElementById("closeConfirmDeleteModal");
+    const deleteStudentName = document.getElementById("deleteStudentName");
+    const cancelDeleteBtn = document.getElementById("cancelDeleteBtn");
+    const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
+    
+    // Tab elements
+    const tabs = document.querySelectorAll(".tab");
+    const tabContents = document.querySelectorAll(".tab-content");
+    
+    // Temporary variables
+    let selectedStudent = null;
+    let studentToDelete = null;
+    const defaultDate = new Date().toISOString().split('T')[0];
+    
+    // Constants
+    const ASSESSMENT_CATEGORIES = [
+      { id: "organization", name: "Organisation" },
+      { id: "workBehavior", name: "Arbeitsverhalten" },
+      { id: "teamwork", name: "Zusammenarbeit" },
+      { id: "quality", name: "Arbeitsqualität" },
+      { id: "reflection", name: "Reflexion" },
+      { id: "documentation", name: "Dokumentation" }
+    ];
+    
+    // Default teachers (for demo)
+    const DEFAULT_TEACHERS = [
+      { name: "Kretz", code: "KRE", password: "Luna" },
+      { name: "Töllner", code: "TOE", password: "Luna" },
+      { name: "Seuffert", code: "SEU", password: "Luna" },
+      { name: "Lozano", code: "LOZ", password: "Luna" },
+      { name: "Heiler", code: "HEI", password: "Luna" },
+      { name: "Köhler", code: "KOE", password: "Luna" },
+      { name: "Heid", code: "HID", password: "Luna" },
+      { name: "Bender", code: "BEN", password: "Luna" }
+    ];
+    
+    // Helper Functions
+    function formatDate(isoDateString) {
+      const date = new Date(isoDateString + "T00:00:00");
+      if(isNaN(date.getTime())) return isoDateString;
+      
+      return date.toLocaleDateString('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    }
+    
+    function showNotification(message, type = "success") {
+      const notification = document.createElement('div');
+      notification.className = `notification ${type}`;
+      notification.textContent = message;
+      
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.remove();
+      }, 3000);
+    }
+    
+    function showLoader() {
+      mainLoader.style.display = "flex";
+    }
+    
+    function hideLoader() {
+      mainLoader.style.display = "none";
+    }
+    
+    function getAverageGrade(student) {
+      if (!teacherData.assessments[student.id]) return null;
+      
+      const assessment = teacherData.assessments[student.id];
+      let sum = 0;
+      let count = 0;
+      
+      ASSESSMENT_CATEGORIES.forEach(category => {
+        if (assessment[category.id] && assessment[category.id] > 0) {
+          sum += assessment[category.id];
+          count++;
+        }
+      });
+      
+      if (count === 0) return null;
+      
+      return (sum / count).toFixed(1);
+    }
+    
+    function generateId() {
+      return Date.now().toString(36) + Math.random().toString(36).substring(2);
+    }
+    
+    function isStudentOnExamDay(studentId, examDate) {
+      return teacherData.students.some(s => 
+        s.id !== studentId && s.examDate === examDate
+      );
+    }
+    
+    // Initialize the application
+    function init() {
+      // Set today's date as default for new students
+      examDate.value = defaultDate;
+      
+      initTeacherGrid();
+      setupEventListeners();
+      hideLoader();
+    }
+    
+    // Initialize teacher grid with teacher cards
+    function initTeacherGrid() {
+      teacherGrid.innerHTML = "";
+      
+      DEFAULT_TEACHERS.forEach(teacher => {
+        const card = document.createElement("div");
+        card.className = "teacher-card";
+        card.dataset.code = teacher.code;
+        card.dataset.name = teacher.name;
+        
+        card.innerHTML = `
+          <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23e0e0e0'/%3E%3Ctext x='50' y='60' font-family='Arial' font-size='30' text-anchor='middle' fill='%23666'%3E${teacher.code.charAt(0)}%3C/text%3E%3C/svg%3E" alt="${teacher.name}">
+          <h3>${teacher.name}</h3>
+        `;
+        
+        card.addEventListener("click", () => {
+          showPasswordModal(teacher);
+        });
+        
+        teacherGrid.appendChild(card);
+      });
+      
+      // Add admin card
+      const adminCard = document.createElement("div");
+      adminCard.className = "teacher-card";
+      adminCard.style.backgroundColor = "#f5f5f5";
+      
+      adminCard.innerHTML = `
+        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23e0e0e0'/%3E%3Ctext x='50' y='60' font-family='Arial' font-size='30' text-anchor='middle' fill='%23666'%3EA%3C/text%3E%3C/svg%3E" alt="Admin">
+        <h3>Administrator</h3>
+      `;
+      
+      adminCard.addEventListener("click", () => {
+        showPasswordModalForAdmin();
+      });
+      
+      teacherGrid.appendChild(adminCard);
+    }
+    
+    // Setup event listeners
+    function setupEventListeners() {
+      // Login events
+      closePasswordModal.addEventListener("click", () => {
+        passwordModal.style.display = "none";
+      });
+      
+      cancelLogin.addEventListener("click", () => {
+        passwordModal.style.display = "none";
+      });
+      
+      confirmLogin.addEventListener("click", login);
+      
+      passwordInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") login();
+      });
+      
+      // Logout event
+      logoutBtn.addEventListener("click", logout);
+      
+      // Tab switching
+      tabs.forEach(tab => {
+        tab.addEventListener("click", () => {
+          const tabId = tab.dataset.tab;
+          
+          tabs.forEach(t => t.classList.remove("active"));
+          tabContents.forEach(c => c.classList.remove("active"));
+          
+          tab.classList.add("active");
+          document.getElementById(`${tabId}-tab`).classList.add("active");
+          
+          if (tabId === "overview") {
+            updateOverview();
+          }
+        });
+      });
+      
+      // Add student button
+      addStudentBtn.addEventListener("click", addNewStudent);
+      
+      // Export/Import data
+      exportDataBtn.addEventListener("click", exportData);
+      importDataBtn.addEventListener("click", () => {
+        importFileInput.click();
+      });
+      
+      importFileInput.addEventListener("change", importData);
+      
+      // Admin reset button
+      resetAllDataBtn.addEventListener("click", () => {
+        if (confirm("Sind Sie sicher, dass Sie ALLE Daten aller Lehrer zurücksetzen möchten? Diese Aktion kann nicht rückgängig gemacht werden!")) {
+          resetAllData();
+        }
+      });
+      
+      // Edit student modal events
+      closeEditStudentModal.addEventListener("click", () => {
+        editStudentModal.style.display = "none";
+      });
+      
+      saveStudentBtn.addEventListener("click", saveEditedStudent);
+      deleteStudentBtn.addEventListener("click", showDeleteConfirmation);
+      
+      // Confirm delete modal events
+      closeConfirmDeleteModal.addEventListener("click", () => {
+        confirmDeleteModal.style.display = "none";
+      });
+      
+      cancelDeleteBtn.addEventListener("click", () => {
+        confirmDeleteModal.style.display = "none";
+      });
+      
+      confirmDeleteBtn.addEventListener("click", deleteStudent);
+    }
+    
+    // Show password modal for teacher login
+    function showPasswordModal(teacher) {
+      loginPrompt.textContent = `Bitte geben Sie das Passwort für ${teacher.name} ein:`;
+      passwordInput.value = "";
+      passwordModal.style.display = "flex";
+      passwordInput.focus();
+      
+      currentUser = {
+        name: teacher.name,
+        code: teacher.code,
+        password: teacher.password
+      };
+      isAdmin = false;
+    }
+    
+    // Show password modal for admin login
+    function showPasswordModalForAdmin() {
+      loginPrompt.textContent = "Bitte geben Sie das Admin-Passwort ein:";
+      passwordInput.value = "";
+      passwordModal.style.display = "flex";
+      passwordInput.focus();
+      
+      currentUser = {
+        name: "Administrator",
+        code: "ADMIN",
+        password: ADMIN_PASSWORD
+      };
+      isAdmin = true;
+    }
+    
+    // Login function
+    async function login() {
+      if (passwordInput.value === currentUser.password) {
+        passwordModal.style.display = "none";
+        showLoader();
+        
+        // Load teacher data from Supabase
+        await loadTeacherData();
+        
+        // Update UI
+        loginSection.style.display = "none";
+        appSection.style.display = "block";
+        
+        teacherInfo.innerHTML = `
+          <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23e0e0e0'/%3E%3Ctext x='50' y='60' font-family='Arial' font-size='30' text-anchor='middle' fill='%23666'%3E${currentUser.code.charAt(0)}%3C/text%3E%3C/svg%3E" alt="${currentUser.name}">
+          <span>${currentUser.name}</span>
+        `;
+        
+        // Show admin settings if admin
+        if (isAdmin) {
+          adminSettings.style.display = "block";
+        } else {
+          adminSettings.style.display = "none";
+        }
+        
+        // Update student lists
+        updateStudentLists();
+        
+        hideLoader();
+        showNotification(`Willkommen, ${currentUser.name}!`);
+      } else {
+        showNotification("Falsches Passwort!", "error");
+      }
+    }
+    
+    // Logout function
+    function logout() {
+      currentUser = null;
+      isAdmin = false;
+      teacherData = {
+        students: [],
+        assessments: {}
+      };
+      
+      loginSection.style.display = "block";
+      appSection.style.display = "none";
+      
+      showNotification("Sie wurden abgemeldet.");
+    }
+    
+    // Load teacher data from Supabase
+    async function loadTeacherData() {
+      try {
+        const { data, error } = await supabase
+          .from('wbs_data')
+          .select('*')
+          .eq('teacher_code', currentUser.code)
+          .single();
+        
+        if (error && error.code !== 'PGRST116') {
+          // PGRST116 is the error code for "no rows returned"
+          console.error("Error loading teacher data:", error);
+          showNotification("Fehler beim Laden der Daten.", "error");
+          return;
+        }
+        
+        if (data) {
+          teacherData = data.data;
+        } else {
+          // Create new data structure for this teacher
+          teacherData = {
+            students: [],
+            assessments: {}
+          };
+          
+          // Save the new structure
+          await saveTeacherData();
+        }
+      } catch (error) {
+        console.error("Error in loadTeacherData:", error);
+        showNotification("Fehler beim Laden der Daten.", "error");
+      }
+    }
+    
+    // Save teacher data to Supabase
+    async function saveTeacherData() {
+      try {
+        const { data, error } = await supabase
+          .from('wbs_data')
+          .upsert({
+            teacher_code: currentUser.code,
+            teacher_name: currentUser.name,
+            data: teacherData,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'teacher_code' });
+        
+        if (error) {
+          console.error("Error saving teacher data:", error);
+          showNotification("Fehler beim Speichern der Daten.", "error");
+          return false;
+        }
+        
+        return true;
+      } catch (error) {
+        console.error("Error in saveTeacherData:", error);
+        showNotification("Fehler beim Speichern der Daten.", "error");
+        return false;
+      }
+    }
+    
+    // Update student lists (today and all)
+    function updateStudentLists() {
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Sort students by exam date (newest first)
+      const sortedStudents = [...teacherData.students].sort((a, b) => {
+        return new Date(b.examDate) - new Date(a.examDate);
+      });
+      
+      // Today's students
+      const todayStudents = sortedStudents.filter(s => s.examDate === today);
+      
+      todayStudentList.innerHTML = "";
+      
+      if (todayStudents.length === 0) {
+        todayStudentList.innerHTML = "<li>Keine Prüflinge für heute</li>";
+      } else {
+        todayStudents.forEach(student => {
+          const li = document.createElement("li");
+          li.className = "student-item";
+          li.dataset.id = student.id;
+          
+          const avgGrade = getAverageGrade(student);
+          
+          li.innerHTML = `
+            <div class="student-name">${student.name}</div>
+            ${avgGrade ? `<div class="average-grade grade-${Math.round(avgGrade)}">${avgGrade}</div>` : ''}
+            <div class="student-actions">
+              <button class="btn-icon btn-secondary edit-student"><span>✏️</span></button>
+            </div>
+          `;
+          
+          li.addEventListener("click", () => {
+            // Select only on the student item itself, not on the buttons
+            if (!event.target.closest('.edit-student')) {
+              selectStudent(student);
+            }
+          });
+          
+          li.querySelector(".edit-student").addEventListener("click", (e) => {
+            e.stopPropagation();
+            showEditStudentModal(student);
+          });
+          
+          todayStudentList.appendChild(li);
+        });
+      }
+      
+      // All students
+      allStudentList.innerHTML = "";
+      
+      if (sortedStudents.length === 0) {
+        allStudentList.innerHTML = "<li>Keine Prüflinge vorhanden</li>";
+      } else {
+        sortedStudents.forEach(student => {
+          if (student.examDate === today) return; // Skip today's students
+          
+          const li = document.createElement("li");
+          li.className = "student-item";
+          li.dataset.id = student.id;
+          
+          const avgGrade = getAverageGrade(student);
+          const examDate = formatDate(student.examDate);
+          
+          li.innerHTML = `
+            <div>
+              <div class="student-name">${student.name}</div>
+              <div class="date-display">${examDate}</div>
+            </div>
+            ${avgGrade ? `<div class="average-grade grade-${Math.round(avgGrade)}">${avgGrade}</div>` : ''}
+            <div class="student-actions">
+              <button class="btn-icon btn-secondary edit-student"><span>✏️</span></button>
+            </div>
+          `;
+          
+          li.addEventListener("click", () => {
+            // Select only on the student item itself, not on the buttons
+            if (!event.target.closest('.edit-student')) {
+              selectStudent(student);
+            }
+          });
+          
+          li.querySelector(".edit-student").addEventListener("click", (e) => {
+            e.stopPropagation();
+            showEditStudentModal(student);
+          });
+          
+          allStudentList.appendChild(li);
+        });
+      }
+    }
+    
+    // Add a new student
+    async function addNewStudent() {
+      const name = newStudentName.value.trim();
+      const date = examDate.value;
+      
+      if (!name) {
+        showNotification("Bitte geben Sie einen Namen ein.", "warning");
+        return;
+      }
+      
+      // Check if student already exists on this exam date
+      const existingStudent = teacherData.students.find(s => 
+        s.name.toLowerCase() === name.toLowerCase() && s.examDate === date
+      );
+      
+      if (existingStudent) {
+        showNotification(`Ein Prüfling mit dem Namen "${name}" existiert bereits für dieses Datum.`, "warning");
+        return;
+      }
+      
+      // Check if another student is already assigned to this date
+      if (isStudentOnExamDay(null, date)) {
+        if (!confirm(`Es existiert bereits ein Prüfling für den ${formatDate(date)}. Möchten Sie trotzdem fortfahren?`)) {
+          return;
+        }
+      }
+      
+      // Create new student
+      const newStudent = {
+        id: generateId(),
+        name: name,
+        examDate: date,
+        createdAt: new Date().toISOString()
+      };
+      
+      showLoader();
+      
+      // Add to students array
+      teacherData.students.push(newStudent);
+      
+      // Initialize assessment
+      teacherData.assessments[newStudent.id] = {};
+      ASSESSMENT_CATEGORIES.forEach(category => {
+        // Default grade is 2
+        teacherData.assessments[newStudent.id][category.id] = 2;
+      });
+      
+      // Save data
+      const saved = await saveTeacherData();
+      
+      if (saved) {
+        // Clear input fields
+        newStudentName.value = "";
+        examDate.value = defaultDate;
+        
+        // Update lists
+        updateStudentLists();
+        
+        // Select the new student
+        selectStudent(newStudent);
+        
+        showNotification(`Prüfling "${name}" wurde hinzugefügt.`);
+      }
+      
+      hideLoader();
+    }
+    
+    // Select a student for assessment
+    function selectStudent(student) {
+      selectedStudent = student;
+      
+      // Highlight the selected student in the lists
+      document.querySelectorAll(".student-item").forEach(item => {
+        item.classList.remove("active");
+        if (item.dataset.id === student.id) {
+          item.classList.add("active");
+        }
+      });
+      
+      // Show assessment form
+      showAssessmentForm(student);
+    }
+    
+    // Show assessment form for a student
+    function showAssessmentForm(student) {
+      const assessment = teacherData.assessments[student.id] || {};
+      
+      // Calculate average grade
+      const avgGrade = getAverageGrade(student);
+      
+      let html = `
+        <h2>${student.name}</h2>
+        <p>Prüfungsdatum: ${formatDate(student.examDate)}</p>
+        
+        <div class="grade-display">Ø ${avgGrade || '-'}</div>
+        
+        <div class="assessment-form">
+      `;
+      
+      ASSESSMENT_CATEGORIES.forEach(category => {
+        const grade = assessment[category.id] || 0;
+        
+        html += `
+          <div class="assessment-category">
+            <h3>${category.name}</h3>
+            <div class="grade-display category-grade">${grade || '-'}</div>
+            <div class="grade-buttons" data-category="${category.id}">
+        `;
+        
+        // Grade buttons (0-6)
+        for (let i = 0; i <= 6; i++) {
+          const isSelected = grade === i;
+          html += `
+            <button class="grade-${i} ${isSelected ? 'selected' : ''}" data-grade="${i}">${i}</button>
+          `;
+        }
+        
+        html += `
+            </div>
+          </div>
+        `;
+      });
+      
+      html += `</div>`;
+      
+      assessmentContent.innerHTML = html;
+      
+      // Add event listeners to grade buttons
+      document.querySelectorAll(".grade-buttons button").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const category = btn.parentElement.dataset.category;
+          const grade = parseInt(btn.dataset.grade);
+          
+          // Update grade buttons UI
+          const buttons = btn.parentElement.querySelectorAll("button");
+          buttons.forEach(b => b.classList.remove("selected"));
+          btn.classList.add("selected");
+          
+          // Update grade display
+          btn.parentElement.previousElementSibling.textContent = grade || '-';
+          
+          // Update data
+          if (!teacherData.assessments[student.id]) {
+            teacherData.assessments[student.id] = {};
+          }
+          
+          teacherData.assessments[student.id][category] = grade;
+          
+          // Update average grade display
+          const newAvg = getAverageGrade(student);
+          document.querySelector(".grade-display").textContent = `Ø ${newAvg || '-'}`;
+          
+          // Save data
+          await saveTeacherData();
+          
+          // Update student lists to show new average
+          updateStudentLists();
+        });
+      });
+    }
+    
+    // Show edit student modal
+    function showEditStudentModal(student) {
+      editStudentName.value = student.name;
+      editExamDate.value = student.examDate;
+      selectedStudent = student;
+      
+      editStudentModal.style.display = "flex";
+    }
+    
+    // Save edited student
+    async function saveEditedStudent() {
+      const name = editStudentName.value.trim();
+      const date = editExamDate.value;
+      
+      if (!name) {
+        showNotification("Bitte geben Sie einen Namen ein.", "warning");
+        return;
+      }
+      
+      // Check if editing would create a duplicate
+      const existingStudent = teacherData.students.find(s => 
+        s.id !== selectedStudent.id && 
+        s.name.toLowerCase() === name.toLowerCase() && 
+        s.examDate === date
+      );
+      
+      if (existingStudent) {
+        showNotification(`Ein Prüfling mit dem Namen "${name}" existiert bereits für dieses Datum.`, "warning");
+        return;
+      }
+      
+      // Check if another student is already assigned to this date
+      if (date !== selectedStudent.examDate && isStudentOnExamDay(selectedStudent.id, date)) {
+        if (!confirm(`Es existiert bereits ein Prüfling für den ${formatDate(date)}. Möchten Sie trotzdem fortfahren?`)) {
+          return;
+        }
+      }
+      
+      showLoader();
+      
+      // Update student
+      const index = teacherData.students.findIndex(s => s.id === selectedStudent.id);
+      if (index !== -1) {
+        teacherData.students[index].name = name;
+        teacherData.students[index].examDate = date;
+        
+        // Save data
+        const saved = await saveTeacherData();
+        
+        if (saved) {
+          // Update lists
+          updateStudentLists();
+          
+          // Update assessment form if this student is selected
+          if (selectedStudent.id === teacherData.students[index].id) {
+            selectStudent(teacherData.students[index]);
+          }
+          
+          showNotification(`Prüfling "${name}" wurde aktualisiert.`);
+        }
+      }
+      
+      hideLoader();
+      editStudentModal.style.display = "none";
+    }
+    
+    // Show delete confirmation
+    function showDeleteConfirmation() {
+      studentToDelete = selectedStudent;
+      deleteStudentName.textContent = selectedStudent.name;
+      
+      editStudentModal.style.display = "none";
+      confirmDeleteModal.style.display = "flex";
+    }
+    
+    // Delete student
+    async function deleteStudent() {
+      if (!studentToDelete) return;
+      
+      showLoader();
+      
+      // Remove student
+      teacherData.students = teacherData.students.filter(s => s.id !== studentToDelete.id);
+      
+      // Remove assessment
+      delete teacherData.assessments[studentToDelete.id];
+      
+      // Save data
+      const saved = await saveTeacherData();
+      
+      if (saved) {
+        // Update lists
+        updateStudentLists();
+        
+        // Clear assessment form if this student was selected
+        if (selectedStudent && selectedStudent.id === studentToDelete.id) {
+          selectedStudent = null;
+          assessmentContent.innerHTML = `
+            <div class="card">
+              <h2>Willkommen bei der WBS Bewertungsapp</h2>
+              <p>Bitte wählen Sie einen Prüfling aus der Liste oder legen Sie einen neuen Prüfling an.</p>
+            </div>
+          `;
+        }
+        
+        showNotification(`Prüfling "${studentToDelete.name}" wurde gelöscht.`);
+      }
+      
+      hideLoader();
+      confirmDeleteModal.style.display = "none";
+      studentToDelete = null;
+    }
+    
+    // Update overview tab
+    function updateOverview() {
+      if (teacherData.students.length === 0) {
+        overviewContent.innerHTML = `
+          <div class="card">
+            <p>Keine Prüflinge vorhanden. Bitte legen Sie Prüflinge im Tab "Bewertung" an.</p>
+          </div>
+        `;
+        return;
+      }
+      
+      let html = `
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Datum</th>
+              <th>Organisation</th>
+              <th>Arbeitsverhalten</th>
+              <th>Zusammenarbeit</th>
+              <th>Arbeitsqualität</th>
+              <th>Reflexion</th>
+              <th>Dokumentation</th>
+              <th>Durchschnitt</th>
+              <th>Aktionen</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+      
+      // Sort students by exam date (newest first)
+      const sortedStudents = [...teacherData.students].sort((a, b) => {
+        return new Date(b.examDate) - new Date(a.examDate);
+      });
+      
+      sortedStudents.forEach(student => {
+        const assessment = teacherData.assessments[student.id] || {};
+        const avgGrade = getAverageGrade(student);
+        
+        html += `
+          <tr>
+            <td>${student.name}</td>
+            <td>${formatDate(student.examDate)}</td>
+        `;
+        
+        ASSESSMENT_CATEGORIES.forEach(category => {
+          const grade = assessment[category.id] || 0;
+          html += `<td>${grade || '-'}</td>`;
+        });
+        
+        html += `
+            <td><strong>${avgGrade || '-'}</strong></td>
+            <td>
+              <button class="btn-icon btn-secondary edit-student" data-id="${student.id}">
+                <span>✏️</span>
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+      
+      html += `
+          </tbody>
+        </table>
+      `;
+      
+      overviewContent.innerHTML = html;
+      
+      // Add event listeners to edit buttons
+      document.querySelectorAll(".edit-student").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const studentId = btn.dataset.id;
+          const student = teacherData.students.find(s => s.id === studentId);
+          
+          if (student) {
+            showEditStudentModal(student);
+          }
+        });
+      });
+    }
+    
+    // Export data to JSON file
+    function exportData() {
+      const dataStr = JSON.stringify(teacherData);
+      const dataUri = "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
+      
+      const exportFileDefaultName = `wbs-${currentUser.code}-${new Date().toISOString().split('T')[0]}.json`;
+      
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.click();
+      
+      showNotification("Daten wurden exportiert.");
+    }
+    
+    // Import data from JSON file
+    function importData(event) {
+      const file = event.target.files[0];
+      
+      if (!file) return;
+      
+      const reader = new FileReader();
+      
+      reader.onload = async function(e) {
+        try {
+          const importedData = JSON.parse(e.target.result);
+          
+          if (!importedData.students || !importedData.assessments) {
+            showNotification("Ungültiges Dateiformat.", "error");
+            return;
+          }
+          
+          if (confirm("Möchten Sie die aktuellen Daten mit den importierten Daten überschreiben?")) {
+            showLoader();
+            
+            teacherData = importedData;
+            
+            // Save data
+            const saved = await saveTeacherData();
+            
+            if (saved) {
+              // Update UI
+              updateStudentLists();
+              
+              // Clear assessment form
+              selectedStudent = null;
+              assessmentContent.innerHTML = `
+                <div class="card">
+                  <h2>Willkommen bei der WBS Bewertungsapp</h2>
+                  <p>Bitte wählen Sie einen Prüfling aus der Liste oder legen Sie einen neuen Prüfling an.</p>
+                </div>
+              `;
+              
+              showNotification("Daten wurden importiert.");
+            }
+            
+            hideLoader();
+          }
+        } catch (error) {
+          console.error("Error importing data:", error);
+          showNotification("Fehler beim Importieren der Daten.", "error");
+        }
+        
+        // Clear file input
+        event.target.value = "";
+      };
+      
+      reader.readAsText(file);
+    }
+    
+    // Reset all data (admin only)
+    async function resetAllData() {
+      if (!isAdmin) return;
+      
+      showLoader();
+      
+      try {
+        // Delete all data for all teachers
+        const { error } = await supabase
+          .from('wbs_data')
+          .delete()
+          .neq('teacher_code', 'DUMMY_CODE'); // Delete all rows
+        
+        if (error) {
+          console.error("Error resetting data:", error);
+          showNotification("Fehler beim Zurücksetzen der Daten.", "error");
+          hideLoader();
+          return;
+        }
+        
+        // Reset current data
+        teacherData = {
+          students: [],
+          assessments: {}
+        };
+        
+        // Update UI
+        updateStudentLists();
+        
+        // Clear assessment form
+        selectedStudent = null;
+        assessmentContent.innerHTML = `
+          <div class="card">
+            <h2>Willkommen bei der WBS Bewertungsapp</h2>
+            <p>Bitte wählen Sie einen Prüfling aus der Liste oder legen Sie einen neuen Prüfling an.</p>
+          </div>
+        `;
+        
+        showNotification("Alle Daten wurden zurückgesetzt.");
+      } catch (error) {
+        console.error("Error in resetAllData:", error);
+        showNotification("Fehler beim Zurücksetzen der Daten.", "error");
+      }
+      
+      hideLoader();
+    }
+    
+    // Initialize the application
+    document.addEventListener("DOMContentLoaded", init);
+  </script>
+</body>
+</html>
