@@ -1133,6 +1133,12 @@ function handleAdminFileAction(e) {
           target.textContent = makePublic ? 'Öffentlich machen' : 'Privat machen';
           target.disabled = false;
         }
+      })
+      .catch(error => {
+        console.error("Unerwarteter Fehler bei Sichtbarkeitsänderung:", error);
+        showError(`Fehler beim Ändern der Sichtbarkeit: ${error.message || "Unbekannter Fehler"}`);
+        target.textContent = makePublic ? 'Öffentlich machen' : 'Privat machen';
+        target.disabled = false;
       });
   }
 }
