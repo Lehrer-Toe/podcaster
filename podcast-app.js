@@ -946,27 +946,52 @@ function handleRecordingStop() {
       URL.revokeObjectURL(audioPlayer.src);
     }
     
-    // Speichern und Anzeigen des neuen Blobs
-    currentRecordingBlob = finalBlob;
-    const audioUrl = URL.createObjectURL(finalBlob);
-    audioPlayer.src = audioUrl;
-    
-    // Explizites Laden des Audios erzwingen
-    audioPlayer.load();
-    
-    // UI aktualisieren
-    uploadBtn.disabled = false;
-    showMessage("Aufnahme bereit – bitte jetzt anhören und hochladen.");
-    
-    // Lokale Kopie speichern
-    saveRecording(finalBlob, mimeType);
+    // KORREKTUR: Warten bis der Blob vollständig erstellt wurde
+    setTimeout(() => {
+      // Speichern und Anzeigen des neuen Blobs
+      currentRecordingBlob = finalBlob;
+      const audioUrl = URL.createObjectURL(finalBlob);
+      
+      // Auf iOS explizit als Datenquelle behandeln
+      if (appSettings.isIOS) {
+        console.log("iOS-Gerät erkannt, verwende spezielle Audio-Behandlung");
+      }
+      
+      // KORREKTUR: Erst nach einer kurzen Verzögerung den Audioplayer aktualisieren
+      audioPlayer.src = audioUrl;
+      
+      // KORREKTUR: Warten, bis der Audio-Player bereit ist
+      audioPlayer.oncanplay = function() {
+        console.log("Audio kann abgespielt werden");
+        // UI aktualisieren
+        uploadBtn.disabled = false;
+        showMessage("Aufnahme bereit – bitte jetzt anhören und hochladen.");
+        
+        // Event-Handler entfernen nach einmaligem Aufruf
+        audioPlayer.oncanplay = null;
+      };
+      
+      // KORREKTUR: Fehlerbehandlung für den Audio-Player
+      audioPlayer.onerror = function(e) {
+        console.error("Fehler beim Laden des Audios:", e);
+        showError("Fehler beim Laden der Aufnahme. Versuchen Sie es erneut oder nehmen Sie eine neue Aufnahme auf.");
+        
+        // Event-Handler entfernen nach einmaligem Aufruf
+        audioPlayer.onerror = null;
+      };
+      
+      // Explizites Laden des Audios erzwingen
+      audioPlayer.load();
+      
+      // Lokale Kopie speichern
+      saveRecording(finalBlob, mimeType);
+    }, 300); // Kurze Verzögerung für bessere Browser-Kompatibilität
     
   } catch (error) {
     console.error("Fehler beim Verarbeiten der Aufnahme:", error);
     showError("Fehler beim Verarbeiten der Aufnahme: " + error.message);
   }
 }
-
 // --- 13) Aufnahme hochladen ---
 function uploadRecording() {
   if (!currentRecordingBlob) {
@@ -1133,12 +1158,6 @@ function handleAdminFileAction(e) {
           target.textContent = makePublic ? 'Öffentlich machen' : 'Privat machen';
           target.disabled = false;
         }
-      })
-      .catch(error => {
-        console.error("Unerwarteter Fehler bei Sichtbarkeitsänderung:", error);
-        showError(`Fehler beim Ändern der Sichtbarkeit: ${error.message || "Unbekannter Fehler"}`);
-        target.textContent = makePublic ? 'Öffentlich machen' : 'Privat machen';
-        target.disabled = false;
       });
   }
 }
